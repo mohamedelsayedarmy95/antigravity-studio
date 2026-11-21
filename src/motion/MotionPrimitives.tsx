@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useId } from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
 import { appSpring, SpringPresetName } from "./springPresets";
 import { FONT_FAMILIES } from "../typography/fonts";
@@ -204,63 +204,6 @@ export const KineticCharWave: React.FC<KineticCharWaveProps> = ({
 };
 
 // -------------------------------------------------------------------------
-// Primitive 5: PerspectiveTilt (Cinematic 3D Device / Card Pointer Momentum)
-// -------------------------------------------------------------------------
-export interface PerspectiveTiltProps {
-  children: React.ReactNode;
-  delay?: number;
-  maxRotateX?: number;
-  maxRotateY?: number;
-  className?: string;
-  style?: React.CSSProperties;
-}
-
-export const PerspectiveTilt: React.FC<PerspectiveTiltProps> = ({
-  children,
-  delay = 0,
-  maxRotateX = 14,
-  maxRotateY = -18,
-  className = "",
-  style = {},
-}) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const progress = appSpring({
-    frame,
-    fps,
-    preset: "appleHero",
-    delay,
-  });
-
-  // Calculate dynamic rotation with harmonic decay
-  const rotateX = interpolate(progress, [0, 0.7, 1], [maxRotateX, -3, 0]);
-  const rotateY = interpolate(progress, [0, 0.7, 1], [maxRotateY, 4, 0]);
-  const scale = interpolate(progress, [0, 1], [0.92, 1]);
-
-  return (
-    <div
-      style={{
-        perspective: "1200px",
-        perspectiveOrigin: "center center",
-      }}
-    >
-      <div
-        className={className}
-        style={{
-          transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(${scale}, ${scale}, 1)`,
-          transformStyle: "preserve-3d",
-          willChange: "transform",
-          ...style,
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-};
-
-// -------------------------------------------------------------------------
 // Primitive 6: MaskedPillReveal (Pill to Card Morph via Clip-Path)
 // -------------------------------------------------------------------------
 export interface MaskedPillRevealProps {
@@ -434,101 +377,6 @@ export const LevitationHarmonic: React.FC<LevitationHarmonicProps> = ({
 };
 
 // -------------------------------------------------------------------------
-// Primitive 9: SpatialFlip3D (Hero 3D Card / Screen Flip)
-// -------------------------------------------------------------------------
-export interface SpatialFlip3DProps {
-  front: React.ReactNode;
-  back: React.ReactNode;
-  delay?: number;
-  preset?: SpringPresetName;
-  chromaticAberration?: boolean;
-  className?: string;
-  style?: React.CSSProperties;
-}
-
-export const SpatialFlip3D: React.FC<SpatialFlip3DProps> = ({
-  front,
-  back,
-  delay = 30,
-  preset = "appleSnappy",
-  chromaticAberration = true,
-  className = "",
-  style = {},
-}) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const progress = appSpring({
-    frame,
-    fps,
-    preset,
-    delay,
-  });
-
-  const prevProgress = appSpring({
-    frame: frame - 1,
-    fps,
-    preset,
-    delay,
-  });
-
-  const velocity = Math.abs(progress - prevProgress) * fps;
-  const dx = chromaticAberration
-    ? interpolate(velocity, [0, 8], [0, 1.2], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      })
-    : 0;
-
-  const rotation = interpolate(progress, [0, 1], [0, 180]);
-  const zOffset = interpolate(progress, [0, 0.5, 1], [0, -120, 0]);
-  const filterId = "flip3d-chromatic";
-  const hasFilter = dx > 0.25;
-
-  return (
-    <div
-      style={{
-        perspective: "1400px",
-      }}
-    >
-      {hasFilter && <ChromaticAberrationFilterDef id={filterId} dx={dx} />}
-      <div
-        className={`relative ${className}`}
-        style={{
-          transform: `translateZ(${zOffset}px) rotateY(${rotation}deg)`,
-          transformStyle: "preserve-3d",
-          willChange: "transform, filter",
-          filter: hasFilter ? `url(#${filterId})` : "none",
-          ...style,
-        }}
-      >
-        {/* Front face */}
-        <div
-          className="w-full h-full"
-          style={{
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
-          }}
-        >
-          {front}
-        </div>
-        {/* Back face */}
-        <div
-          className="absolute inset-0 w-full h-full"
-          style={{
-            transform: "rotateY(180deg)",
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
-          }}
-        >
-          {back}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// -------------------------------------------------------------------------
 // Primitive 10: MomentumSwipe (Inertia Screen Carousel Transition)
 // -------------------------------------------------------------------------
 export interface MomentumSwipeProps {
@@ -586,7 +434,8 @@ export const MomentumSwipe: React.FC<MomentumSwipeProps> = ({
     [-(activeItemIndex - 1) * totalCardStep, -activeItemIndex * totalCardStep]
   );
 
-  const filterId = "swipe-chromatic";
+  // Unique per instance: a shared id made two carousels on screen fight over one SVG filter.
+  const filterId = `swipe-chromatic-${useId().replace(/:/g, "_")}`;
   const hasFilter = dx > 0.04;
 
   return (
