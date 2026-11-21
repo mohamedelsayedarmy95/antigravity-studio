@@ -52,7 +52,9 @@
     "determinism": "tsx scripts/determinism.ts",
     "validate-springs": "tsx scripts/validateSprings.ts",
     "stills": "tsx scripts/stills.ts",
-    "test": "tsx --test tests/*.test.ts"
+    "factory": "tsx scripts/factory.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "test:factory": "tsx --test tests/factory.integration.ts"
   },
   "allowScripts": {
     "esbuild": false

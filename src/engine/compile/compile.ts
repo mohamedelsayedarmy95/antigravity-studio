@@ -157,7 +157,9 @@ export function compileFilm(input: FilmSpecInput): CompiledFilm {
   // 3. References: markers, data series, particle form targets.
   const known = Object.keys(markers);
   spec.timeline.forEach((s, i) => {
-    for (const { path, ref } of markerRefs({ world: s.world, camera: s.camera, overlay: s.overlay, post: s.post }, `timeline.${i}`)) {
+    // Overlay TimeRefs are at/out. The other strings are literal copy or data keys.
+    const overlay = s.overlay.map(({ at, out }) => ({ at, out }));
+    for (const { path, ref } of markerRefs({ world: s.world, camera: s.camera, overlay, post: s.post }, `timeline.${i}`)) {
       const m = MARKER_REF.exec(ref);
       if (!m) issues.push(`${path}: invalid marker reference "${ref}" (use "@name", "@name+2b", "@name-0.5s")`);
       else if (!(m[1] in markers)) issues.push(`${path}: unknown marker "@${m[1]}".${suggest(m[1], known)}`);
