@@ -15,6 +15,7 @@
     "@remotion/bundler": "4.0.545",
     "@remotion/cli": "4.0.545",
     "@remotion/google-fonts": "4.0.545",
+    "@remotion/layout-utils": "4.0.545",
     "@remotion/media-utils": "4.0.545",
     "@remotion/noise": "4.0.545",
     "@remotion/paths": "4.0.545",
@@ -50,7 +51,8 @@
     "probe": "tsx scripts/probe-gl.ts",
     "determinism": "tsx scripts/determinism.ts",
     "validate-springs": "tsx scripts/validateSprings.ts",
-    "stills": "tsx scripts/stills.ts"
+    "stills": "tsx scripts/stills.ts",
+    "test": "tsx --test tests/*.test.ts"
   },
   "allowScripts": {
     "esbuild": false
