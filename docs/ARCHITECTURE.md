@@ -1,6 +1,6 @@
 # Universal Capability Engine — Architecture v0.1
 
-Status: **proposal for review** (2026-11-21). Nothing here is built yet.
+Status (2026-11-21): **M0 and M1 built** on branch `engine/v1`. See §10 for what exists and the rules M1 added.
 Scope: a general-purpose cinematic motion-graphics engine on Remotion + React Three Fiber. SaveFix and the iPhone are out of scope; a device is just one more 3D asset type.
 
 ---
@@ -504,3 +504,33 @@ A later **Phase D** adds the LLM director: Brief → FilmSpec, schema-constraine
 | DOM text doesn't receive 3D post effects | Documented split (§3); `text3d` for text that needs it |
 | Music licensing for the showcase | Needs a decision (below) |
 | Remotion license | Free for individuals and small companies; check whether a company license applies before paid client work |
+
+---
+
+## 10. Build log
+
+### M0: Foundation (done)
+- Fakes removed: the CSS phone, SaveFix code, CSS-3D primitives, legacy compositions, committed build output and logs. The stack is pinned (three 0.187, R3F 9.8.2, drei 10.7.9, postprocessing 6.39.6, @remotion/three 4.0.545).
+- `pnpm probe` checks each GL backend on this machine:
+  - `angle` and `vulkan`: hardware Radeon.
+  - `angle-egl`: software (Microsoft Basic Render).
+  - `swangle`: software (SwiftShader).
+  - Default: `angle`.
+- `pnpm determinism <id>` checks that repeat renders and in-sequence renders are byte-identical.
+
+### M1: 3D/shader core (done)
+| Area | What exists |
+| :--- | :--- |
+| Time | `src/engine/time`: seeded rng, beat grid and impulses, the time grammar (`"2b"`, `"bar 5"`, `"40%"`, `"2 bars"`), eases (springs fitted to durations), and animatable values with additive keyframes and beat modulators. |
+| Stage | `src/stage3d/Stage.tsx`: one WebGL context per film; scenes mount inside their windows; each scene owns a scene, an fx scene, a camera and a post pipeline. One `useFrame(…, 1)` orchestrator renders, and it reads only film time. |
+| Nodes | `morph` (parametric shapes with a shared (u,v) domain, normals from finite differences, any shape → any shape, full PBR via CSM), `primitive`, `logo` (SVG → bevelled extrusion), `particles` (GPU, closed form, form-to-morph/logo, soft depth, in-shader bokeh). |
+| Look | 9 PBR material presets; 3 lightformer rigs baked into PMREM; void, gradient and grid backdrops. |
+| Camera | Lens in mm applied to the frame's short side; framing by bounding-radius fill; orbit, pushIn, pullBack, crane, truck, seeded handheld, and beat impulse. |
+| Post | MSAA HDR → DoF → particles → bloom → chromatic aberration (motion-driven) + ACES/AgX + vignette. |
+| Transitions | Compositor: dissolve, noiseDissolve, lightSweep, glitchSlice, zoomThrough; plus sRGB encode, seeded grain and dither. |
+| Films | `src/films/*` are registered automatically × 16:9 / 9:16 / 1:1 in `Root.tsx`. |
+
+### Rules M1 added to the determinism contract (§6)
+7. **Pull, don't push, per-frame values into GPU state.** Values that a pass needs every frame (focus distance, depth texture, resolution) are read by the pass at render time. Pushing them from a parent's React effect broke determinism when a child mounted asynchronously: an SVG load re-rendered the particle node but not its host, so the first frame of a page used the default focus. `pnpm determinism` caught it on the scrub check.
+8. **Glass is not a depth occluder for particles.** When a scene has transmissive meshes, the particle pass renders its own depth prepass without them. Otherwise glass reads as opaque.
+9. **No `instanceof` on materials.** three-custom-shader-material copies properties onto a plain `Material`; use `asPhysical()`.
