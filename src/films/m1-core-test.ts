@@ -1,4 +1,4 @@
-import type { Film3DInput } from "../stage3d/schema";
+import type { FilmSpecInput } from "../engine/schema/film";
 
 /**
  * M1 vertical-slice film: exercises every 3D-core capability from config alone.
@@ -9,11 +9,13 @@ import type { Film3DInput } from "../stage3d/schema";
  *  grid     (2 bars)  glitch-slice in; chrome knot over a beat-pulsing cyber grid, data dust
  *  mark     (3 bars)  noise-dissolve in; particles assemble the extruded brushed-metal mark
  */
-export const m1CoreTest: Film3DInput = {
+export const m1CoreTest: FilmSpecInput = {
+  schemaVersion: "1",
   id: "m1-core-test",
   seed: 7,
-  fps: 60,
-  grid: { bpm: 120, offset: 0, beatsPerBar: 4 },
+  look: "cyber",
+  output: { fps: 60, aspects: ["16x9", "9x16", "1x1"] },
+  audio: { grid: { bpm: 120, offset: 0, beatsPerBar: 4 }, quantize: "bar" },
   palette: {
     base: "#04060a",
     surface: "#0c1624",
@@ -28,7 +30,7 @@ export const m1CoreTest: Film3DInput = {
     vignette: { darkness: 0.6, offset: 0.28 },
     grain: 0.035,
   },
-  scenes: [
+  timeline: [
     {
       id: "genesis",
       length: "3 bars",

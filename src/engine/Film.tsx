@@ -1,0 +1,24 @@
+import React, { useMemo } from "react";
+import { AbsoluteFill, useVideoConfig } from "remotion";
+import { ThreeCanvas } from "@remotion/three";
+import { OverlayLayer } from "../layer2d/OverlayLayer";
+import { Stage } from "../stage3d/Stage";
+import { compileFilm } from "./compile/compile";
+import type { FilmSpecInput } from "./schema/film";
+
+/**
+ * The one composition component. Any FilmSpec, any aspect: the compiler plans it, the 3D stage
+ * renders the world, the 2D layer renders type and data on top.
+ */
+export const Film: React.FC<{ spec: FilmSpecInput }> = ({ spec }) => {
+  const { width, height } = useVideoConfig();
+  const compiled = useMemo(() => compileFilm(spec), [spec]);
+  return (
+    <AbsoluteFill style={{ backgroundColor: "#000000" }}>
+      <ThreeCanvas width={width} height={height} flat gl={{ antialias: false, alpha: false, powerPreference: "high-performance", stencil: false }}>
+        <Stage plan={compiled.stage} aspect={width / height} />
+      </ThreeCanvas>
+      <OverlayLayer compiled={compiled} />
+    </AbsoluteFill>
+  );
+};
