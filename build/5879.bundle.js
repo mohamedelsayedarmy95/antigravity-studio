@@ -1,0 +1,111 @@
+"use strict";
+(self["rspackChunkstudio_engine"] = self["rspackChunkstudio_engine"] || []).push([[5879], {
+6589(__webpack_module__, __webpack_exports__, __webpack_require__) {
+// src/components/effect-preview-loaders.ts
+var effectPreviewLoaders = {
+  "@remotion/effects/brightness": () => __webpack_require__.e(/* import() */ 3778).then(__webpack_require__.bind(__webpack_require__, 5769)),
+  "@remotion/effects/contrast": () => __webpack_require__.e(/* import() */ 5479).then(__webpack_require__.bind(__webpack_require__, 6746)),
+  "@remotion/effects/color-correction": () => __webpack_require__.e(/* import() */ 6455).then(__webpack_require__.bind(__webpack_require__, 3802)),
+  "@remotion/effects/color-key": () => __webpack_require__.e(/* import() */ 1460).then(__webpack_require__.bind(__webpack_require__, 7439)),
+  "@remotion/effects/curves": () => __webpack_require__.e(/* import() */ 9893).then(__webpack_require__.bind(__webpack_require__, 5428)),
+  "@remotion/effects/duotone": () => __webpack_require__.e(/* import() */ 8897).then(__webpack_require__.bind(__webpack_require__, 456)),
+  "@remotion/effects/exposure": () => __webpack_require__.e(/* import() */ 6088).then(__webpack_require__.bind(__webpack_require__, 9867)),
+  "@remotion/effects/grayscale": () => __webpack_require__.e(/* import() */ 8942).then(__webpack_require__.bind(__webpack_require__, 9581)),
+  "@remotion/effects/hue": () => __webpack_require__.e(/* import() */ 7499).then(__webpack_require__.bind(__webpack_require__, 4678)),
+  "@remotion/effects/invert": () => __webpack_require__.e(/* import() */ 549).then(__webpack_require__.bind(__webpack_require__, 6983)),
+  "@remotion/effects/levels": () => __webpack_require__.e(/* import() */ 7402).then(__webpack_require__.bind(__webpack_require__, 1105)),
+  "@remotion/effects/lut": () => __webpack_require__.e(/* import() */ 7400).then(__webpack_require__.bind(__webpack_require__, 6939)),
+  "@remotion/effects/saturation": () => __webpack_require__.e(/* import() */ 6749).then(__webpack_require__.bind(__webpack_require__, 1660)),
+  "@remotion/effects/shadows-highlights": () => __webpack_require__.e(/* import() */ 2020).then(__webpack_require__.bind(__webpack_require__, 3439)),
+  "@remotion/effects/tint": () => __webpack_require__.e(/* import() */ 7792).then(__webpack_require__.bind(__webpack_require__, 1395)),
+  "@remotion/effects/white-balance": () => __webpack_require__.e(/* import() */ 9605).then(__webpack_require__.bind(__webpack_require__, 8820)),
+  "@remotion/effects/vibrance": () => __webpack_require__.e(/* import() */ 375).then(__webpack_require__.bind(__webpack_require__, 4618)),
+  "@remotion/effects/linear-gradient": () => __webpack_require__.e(/* import() */ 5543).then(__webpack_require__.bind(__webpack_require__, 6650)),
+  "@remotion/effects/linear-gradient-tint": () => __webpack_require__.e(/* import() */ 9032).then(__webpack_require__.bind(__webpack_require__, 9243)),
+  "@remotion/effects/thermal-vision": () => __webpack_require__.e(/* import() */ 763).then(__webpack_require__.bind(__webpack_require__, 3414)),
+  "@remotion/effects/blur": () => __webpack_require__.e(/* import() */ 3600).then(__webpack_require__.bind(__webpack_require__, 6307)),
+  "@remotion/effects/lens-blur": () => __webpack_require__.e(/* import() */ 971).then(__webpack_require__.bind(__webpack_require__, 7830)),
+  "@remotion/effects/linear-progressive-blur": () => Promise.all(/* import() */ [__webpack_require__.e(465), __webpack_require__.e(7414)]).then(__webpack_require__.bind(__webpack_require__, 997)),
+  "@remotion/effects/radial-progressive-blur": () => Promise.all(/* import() */ [__webpack_require__.e(465), __webpack_require__.e(88)]).then(__webpack_require__.bind(__webpack_require__, 5595)),
+  "@remotion/effects/region-blur": () => Promise.all(/* import() */ [__webpack_require__.e(465), __webpack_require__.e(1283)]).then(__webpack_require__.bind(__webpack_require__, 6286)),
+  "@remotion/effects/zoom-blur": () => __webpack_require__.e(/* import() */ 3206).then(__webpack_require__.bind(__webpack_require__, 1445)),
+  "@remotion/effects/drop-shadow": () => Promise.all(/* import() */ [__webpack_require__.e(465), __webpack_require__.e(7649)]).then(__webpack_require__.bind(__webpack_require__, 360)),
+  "@remotion/effects/long-shadows": () => __webpack_require__.e(/* import() */ 4087).then(__webpack_require__.bind(__webpack_require__, 7962)),
+  "@remotion/effects/glow": () => Promise.all(/* import() */ [__webpack_require__.e(465), __webpack_require__.e(3916)]).then(__webpack_require__.bind(__webpack_require__, 391)),
+  "@remotion/effects/outline": () => __webpack_require__.e(/* import() */ 1803).then(__webpack_require__.bind(__webpack_require__, 2278)),
+  "@remotion/effects/light-trail": () => __webpack_require__.e(/* import() */ 3724).then(__webpack_require__.bind(__webpack_require__, 87)),
+  "@remotion/effects/evolve": () => __webpack_require__.e(/* import() */ 8416).then(__webpack_require__.bind(__webpack_require__, 8035)),
+  "@remotion/effects/tear": () => __webpack_require__.e(/* import() */ 3477).then(__webpack_require__.bind(__webpack_require__, 9316)),
+  "@remotion/effects/film-burn": () => __webpack_require__.e(/* import() */ 221).then(__webpack_require__.bind(__webpack_require__, 5679)),
+  "@remotion/effects/radial-wipe": () => __webpack_require__.e(/* import() */ 1988).then(__webpack_require__.bind(__webpack_require__, 639)),
+  "@remotion/effects/iris-wipe": () => __webpack_require__.e(/* import() */ 4020).then(__webpack_require__.bind(__webpack_require__, 8607)),
+  "@remotion/effects/venetian-blinds": () => __webpack_require__.e(/* import() */ 7898).then(__webpack_require__.bind(__webpack_require__, 6049)),
+  "@remotion/effects/mirror": () => __webpack_require__.e(/* import() */ 9790).then(__webpack_require__.bind(__webpack_require__, 9053)),
+  "@remotion/effects/scale": () => __webpack_require__.e(/* import() */ 3671).then(__webpack_require__.bind(__webpack_require__, 2138)),
+  "@remotion/effects/tile": () => __webpack_require__.e(/* import() */ 5627).then(__webpack_require__.bind(__webpack_require__, 8102)),
+  "@remotion/effects/translate": () => __webpack_require__.e(/* import() */ 1447).then(__webpack_require__.bind(__webpack_require__, 874)),
+  "@remotion/effects/barrel-distortion": () => __webpack_require__.e(/* import() */ 9573).then(__webpack_require__.bind(__webpack_require__, 244)),
+  "@remotion/effects/chromatic-aberration": () => __webpack_require__.e(/* import() */ 7907).then(__webpack_require__.bind(__webpack_require__, 286)),
+  "@remotion/effects/magnify": () => __webpack_require__.e(/* import() */ 7502).then(__webpack_require__.bind(__webpack_require__, 5722)),
+  "@remotion/effects/fisheye": () => __webpack_require__.e(/* import() */ 7258).then(__webpack_require__.bind(__webpack_require__, 1217)),
+  "@remotion/effects/corner-pin": () => __webpack_require__.e(/* import() */ 1273).then(__webpack_require__.bind(__webpack_require__, 6320)),
+  "@remotion/effects/page-turn": () => __webpack_require__.e(/* import() */ 872).then(__webpack_require__.bind(__webpack_require__, 7976)),
+  "@remotion/effects/sphere": () => __webpack_require__.e(/* import() */ 5004).then(__webpack_require__.bind(__webpack_require__, 2919)),
+  "@remotion/effects/cylinder": () => __webpack_require__.e(/* import() */ 387).then(__webpack_require__.bind(__webpack_require__, 3918)),
+  "@remotion/effects/wave": () => __webpack_require__.e(/* import() */ 1752).then(__webpack_require__.bind(__webpack_require__, 9691)),
+  "@remotion/effects/skew": () => __webpack_require__.e(/* import() */ 3831).then(__webpack_require__.bind(__webpack_require__, 4266)),
+  "@remotion/effects/turbulent-displace": () => __webpack_require__.e(/* import() */ 7320).then(__webpack_require__.bind(__webpack_require__, 4059)),
+  "@remotion/effects/burlap": () => __webpack_require__.e(/* import() */ 8455).then(__webpack_require__.bind(__webpack_require__, 2378)),
+  "@remotion/effects/bevel-alpha": () => __webpack_require__.e(/* import() */ 8056).then(__webpack_require__.bind(__webpack_require__, 8555)),
+  "@remotion/effects/emboss": () => __webpack_require__.e(/* import() */ 6042).then(__webpack_require__.bind(__webpack_require__, 481)),
+  "@remotion/effects/dot-grid": () => __webpack_require__.e(/* import() */ 3491).then(__webpack_require__.bind(__webpack_require__, 5454)),
+  "@remotion/effects/halftone": () => __webpack_require__.e(/* import() */ 4584).then(__webpack_require__.bind(__webpack_require__, 155)),
+  "@remotion/effects/noise": () => __webpack_require__.e(/* import() */ 3219).then(__webpack_require__.bind(__webpack_require__, 9806)),
+  "@remotion/effects/noise-displacement": () => __webpack_require__.e(/* import() */ 6431).then(__webpack_require__.bind(__webpack_require__, 6066)),
+  "@remotion/effects/paper": () => __webpack_require__.e(/* import() */ 8779).then(__webpack_require__.bind(__webpack_require__, 5414)),
+  "@remotion/effects/roughen-edges": () => __webpack_require__.e(/* import() */ 2504).then(__webpack_require__.bind(__webpack_require__, 1339)),
+  "@remotion/effects/pattern": () => __webpack_require__.e(/* import() */ 8660).then(__webpack_require__.bind(__webpack_require__, 8143)),
+  "@remotion/effects/pixel-dissolve": () => __webpack_require__.e(/* import() */ 7081).then(__webpack_require__.bind(__webpack_require__, 4432)),
+  "@remotion/effects/pixelate": () => __webpack_require__.e(/* import() */ 1549).then(__webpack_require__.bind(__webpack_require__, 7580)),
+  "@remotion/effects/linear-progressive-pixelate": () => Promise.all(/* import() */ [__webpack_require__.e(8663), __webpack_require__.e(8435)]).then(__webpack_require__.bind(__webpack_require__, 6302)),
+  "@remotion/effects/radial-progressive-pixelate": () => Promise.all(/* import() */ [__webpack_require__.e(8663), __webpack_require__.e(2757)]).then(__webpack_require__.bind(__webpack_require__, 9940)),
+  "@remotion/effects/scanlines": () => __webpack_require__.e(/* import() */ 7685).then(__webpack_require__.bind(__webpack_require__, 6084)),
+  "@remotion/effects/speckle": () => __webpack_require__.e(/* import() */ 622).then(__webpack_require__.bind(__webpack_require__, 8157)),
+  "@remotion/effects/shatter": () => __webpack_require__.e(/* import() */ 5900).then(__webpack_require__.bind(__webpack_require__, 7623)),
+  "@remotion/effects/shine": () => __webpack_require__.e(/* import() */ 3782).then(__webpack_require__.bind(__webpack_require__, 8517)),
+  "@remotion/effects/shrinkwrap": () => __webpack_require__.e(/* import() */ 1664).then(__webpack_require__.bind(__webpack_require__, 627)),
+  "@remotion/effects/vignette": () => __webpack_require__.e(/* import() */ 7343).then(__webpack_require__.bind(__webpack_require__, 8706)),
+  "@remotion/effects/lightning": () => __webpack_require__.e(/* import() */ 1455).then(__webpack_require__.bind(__webpack_require__, 6930)),
+  "@remotion/effects/rain-fall": () => Promise.all(/* import() */ [__webpack_require__.e(4783), __webpack_require__.e(6417)]).then(__webpack_require__.bind(__webpack_require__, 7784)),
+  "@remotion/effects/snow-fall": () => Promise.all(/* import() */ [__webpack_require__.e(4783), __webpack_require__.e(9922)]).then(__webpack_require__.bind(__webpack_require__, 8601)),
+  "@remotion/effects/fractal-noise": () => __webpack_require__.e(/* import() */ 3715).then(__webpack_require__.bind(__webpack_require__, 6974)),
+  "@remotion/effects/contour-lines": () => __webpack_require__.e(/* import() */ 573).then(__webpack_require__.bind(__webpack_require__, 332)),
+  "@remotion/effects/liquid-contours": () => __webpack_require__.e(/* import() */ 6017).then(__webpack_require__.bind(__webpack_require__, 952)),
+  "@remotion/effects/checkerboard": () => __webpack_require__.e(/* import() */ 3620).then(__webpack_require__.bind(__webpack_require__, 2095)),
+  "@remotion/effects/flannel": () => __webpack_require__.e(/* import() */ 7189).then(__webpack_require__.bind(__webpack_require__, 4724)),
+  "@remotion/effects/halftone-linear-gradient": () => __webpack_require__.e(/* import() */ 601).then(__webpack_require__.bind(__webpack_require__, 9424)),
+  "@remotion/effects/gridlines": () => __webpack_require__.e(/* import() */ 3606).then(__webpack_require__.bind(__webpack_require__, 3154)),
+  "@remotion/effects/white-noise": () => __webpack_require__.e(/* import() */ 6775).then(__webpack_require__.bind(__webpack_require__, 7469)),
+  "@remotion/effects/tv-signal-off": () => __webpack_require__.e(/* import() */ 412).then(__webpack_require__.bind(__webpack_require__, 5479)),
+  "@remotion/effects/lines": () => __webpack_require__.e(/* import() */ 9810).then(__webpack_require__.bind(__webpack_require__, 5529)),
+  "@remotion/effects/rings": () => __webpack_require__.e(/* import() */ 3299).then(__webpack_require__.bind(__webpack_require__, 3774)),
+  "@remotion/effects/waves": () => __webpack_require__.e(/* import() */ 2167).then(__webpack_require__.bind(__webpack_require__, 6442)),
+  "@remotion/effects/zigzag": () => __webpack_require__.e(/* import() */ 5423).then(__webpack_require__.bind(__webpack_require__, 5970)),
+  "@remotion/effects/light-leak": () => __webpack_require__.e(/* import() */ 2127).then(__webpack_require__.bind(__webpack_require__, 6850)),
+  "@remotion/effects/starburst": () => __webpack_require__.e(/* import() */ 8491).then(__webpack_require__.bind(__webpack_require__, 6566))
+};
+if ( true && typeof __webpack_module__.hot?.accept === "function") {
+  __webpack_module__.hot.accept();
+}
+
+
+__webpack_require__.d(__webpack_exports__, {
+}, {
+  effectPreviewLoaders: effectPreviewLoaders
+});
+
+
+},
+
+}]);
+//# sourceMappingURL=5879.bundle.js.map
