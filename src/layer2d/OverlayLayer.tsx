@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AbsoluteFill, cancelRender, continueRender, delayRender, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
-import type { Look } from "../looks";
-import { FONT_FAMILIES } from "../typography/fonts";
+import { loadLocalFonts } from "../typography/localFonts";
 import { applyEase } from "../engine/time/ease";
 import { EXIT_SECONDS, type CompiledFilm, type PlannedOverlay } from "../engine/compile/compile";
 import { ChartView, CounterView } from "./dataviz/DataViews";
@@ -12,27 +11,24 @@ import { TextView } from "./text/TextView";
 /**
  * The 2D layer above the 3D stage. Each element lives in its own Sequence (local frame 0 = its
  * `at` time), positioned in the aspect's safe area, with a shared exit animation.
- * Nothing renders until web fonts are loaded, so text measurement is never done on a fallback font.
+ * Text waits for the bundled fonts before it is measured.
  */
-function useFontsReady(look: Look): boolean {
+function useFontsReady(): boolean {
   const [ready, setReady] = useState(false);
-  const [handle] = useState(() => delayRender("Waiting for web fonts"));
+  const [handle] = useState(() => delayRender("Waiting for bundled typography fonts"));
   useEffect(() => {
     let alive = true;
-    // document.fonts.ready can resolve before lazily-added faces start loading, so load every
-    // (weight, family) the look's type roles use explicitly.
-    const specs = new Set(Object.values(look.type).map((t) => `${t.weight} 32px ${FONT_FAMILIES[t.family]}`));
-    Promise.all([...specs].map((s) => document.fonts.load(s)))
+    loadLocalFonts(document)
       .then(() => {
-        const missing = [...specs].filter((s) => !document.fonts.check(s));
-        if (missing.length) throw new Error(`Fonts failed to load: ${missing.join("; ")}`);
         if (alive) setReady(true);
       })
-      .catch((err: Error) => cancelRender(err));
+      .catch((err: Error) => {
+        if (alive) cancelRender(err);
+      });
     return () => {
       alive = false;
     };
-  }, [look]);
+  }, []);
   useEffect(() => {
     if (ready) continueRender(handle);
   }, [ready, handle]);
@@ -62,9 +58,9 @@ const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm }> = ({
   );
 };
 
-export const OverlayLayer: React.FC<{ compiled: CompiledFilm }> = ({ compiled }) => {
+const LoadedOverlay: React.FC<{ compiled: CompiledFilm }> = ({ compiled }) => {
   const { fps, width, height } = useVideoConfig();
-  const ready = useFontsReady(compiled.look);
+  const ready = useFontsReady();
   if (!ready) return null;
   return (
     <AbsoluteFill style={{ pointerEvents: "none", ...typeStyle("body", compiled.look, { width, height }) }}>
@@ -80,3 +76,6 @@ export const OverlayLayer: React.FC<{ compiled: CompiledFilm }> = ({ compiled })
     </AbsoluteFill>
   );
 };
+
+export const OverlayLayer: React.FC<{ compiled: CompiledFilm }> = ({ compiled }) =>
+  compiled.overlays.length > 0 ? <LoadedOverlay compiled={compiled} /> : null;

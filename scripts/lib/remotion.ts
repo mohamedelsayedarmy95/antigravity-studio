@@ -1,7 +1,7 @@
 import path from "node:path";
 import { bundle } from "@remotion/bundler";
-import { enableTailwind } from "@remotion/tailwind-v4";
 import { selectComposition, type ChromiumOptions } from "@remotion/renderer";
+import { createBundleOverride } from "./bundler";
 
 export const ROOT = path.resolve(import.meta.dirname, "..", "..");
 
@@ -12,7 +12,7 @@ export async function bundleProject(): Promise<string> {
   const started = Date.now();
   const serveUrl = await bundle({
     entryPoint: path.join(ROOT, "src", "index.ts"),
-    webpackOverride: enableTailwind,
+    bundlerOverride: createBundleOverride(ROOT),
     rspack: true,
     enableCaching: true,
   });

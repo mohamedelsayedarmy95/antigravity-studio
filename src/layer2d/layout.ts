@@ -1,5 +1,5 @@
 import type React from "react";
-import { FONT_FAMILIES } from "../typography/fonts";
+import { FONT_FAMILIES } from "../typography/localFonts";
 import type { Look } from "../looks";
 import { ASPECTS, type AspectId, type ColorRef, type Palette } from "../stage3d/schema";
 import type { Anchor, OverlayElement, TypeRole } from "./schema";

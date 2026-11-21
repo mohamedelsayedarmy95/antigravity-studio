@@ -3,10 +3,10 @@
 // covers `remotion studio` / `remotion render` from the CLI.
 
 import { Config } from "@remotion/cli/config";
-import { enableTailwind } from "@remotion/tailwind-v4";
+import { createBundleOverride } from "./scripts/lib/bundler";
 
 Config.setRspack(true);
-Config.overrideBundlerConfig(enableTailwind);
+Config.overrideBundlerConfig(createBundleOverride(process.cwd()));
 Config.setOverwriteOutput(true);
 
 // Three.js needs ANGLE: Chrome's default GL path renders WebGL incorrectly headless.
