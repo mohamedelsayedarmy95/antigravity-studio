@@ -132,7 +132,14 @@ const SceneHost: React.FC<{ planned: PlannedScene; plan: FilmPlan; aspect: numbe
   );
   useEffect(() => () => pipeline.dispose(), [pipeline]);
 
-  const ctx: EvalContext = { fps: plan.fps, grid: plan.grid, sceneStart: planned.start, sceneLength: planned.length, t: time.t - planned.start };
+  const ctx: EvalContext = {
+    fps: plan.fps,
+    grid: plan.grid,
+    sceneStart: planned.start,
+    sceneLength: planned.length,
+    markers: plan.markers,
+    t: time.t - planned.start,
+  };
   const cam = solveCamera(spec.camera, ctx, aspect, plan.seed, planned.id);
   const camPrev = solveCamera(spec.camera, { ...ctx, t: ctx.t - 1 / plan.fps }, aspect, plan.seed, planned.id);
   const speed = cameraSpeed(cam, camPrev, 1 / plan.fps);

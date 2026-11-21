@@ -349,6 +349,8 @@ export const Film3DSchema = z.object({
   fps: z.number().int().positive().default(60),
   grid: z.object({ bpm: z.number().positive(), offset: z.number().default(0), beatsPerBar: z.number().int().default(4) }),
   palette: PaletteSchema,
+  /** Look-level post defaults, applied beneath `post` (set by the FilmSpec compiler). */
+  lookPost: PostSchema.optional(),
   post: PostSchema.optional(),
   scenes: z.array(SceneSchema).min(1),
 });

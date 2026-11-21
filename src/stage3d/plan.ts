@@ -31,6 +31,8 @@ export interface FilmPlan {
   grid: BeatGrid;
   palette: Palette;
   seed: number;
+  /** Absolute-seconds markers available to every TimeRef in the film. */
+  markers: Readonly<Record<string, number>>;
   totalSeconds: number;
   durationInFrames: number;
   scenes: PlannedScene[];
@@ -46,7 +48,7 @@ const PREMOUNT_FRAMES = 12;
  * Pure planning step: validates the spec, resolves scene lengths on the beat grid, centres each
  * transition on its cut, and computes mount windows. No React, no GPU — unit-testable.
  */
-export function planFilm(input: Film3DInput): FilmPlan {
+export function planFilm(input: Film3DInput, markers: Readonly<Record<string, number>> = {}): FilmPlan {
   const parsed = Film3DSchema.safeParse(input);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  • ${i.path.join(".") || "(root)"}: ${i.message}`).join("\n");
@@ -75,7 +77,7 @@ export function planFilm(input: Film3DInput): FilmPlan {
       const tStart = index === 0 ? 0 : start - len / 2;
       transitionIn = { type: scene.transitionIn.type, color: scene.transitionIn.color, start: tStart, end: tStart + len };
     }
-    return { index, id: scene.id, spec: scene, post: resolvePost(spec.post, scene.post), start, length, transitionIn, mountStart: 0, mountEnd: 0 };
+    return { index, id: scene.id, spec: scene, post: resolvePost(spec.lookPost, spec.post, scene.post), start, length, transitionIn, mountStart: 0, mountEnd: 0 };
   });
 
   // Visible span: from the start of this scene's incoming transition to the end of the next one's.
@@ -93,7 +95,7 @@ export function planFilm(input: Film3DInput): FilmPlan {
     ids.add(s.id);
   }
 
-  return { spec, fps, grid, palette: spec.palette, seed: spec.seed, totalSeconds, durationInFrames, scenes };
+  return { spec, fps, grid, palette: spec.palette, seed: spec.seed, markers, totalSeconds, durationInFrames, scenes };
 }
 
 /** What the compositor draws at absolute time t. */
