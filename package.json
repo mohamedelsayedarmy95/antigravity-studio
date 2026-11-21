@@ -49,7 +49,8 @@
     "lint": "eslint src && tsc --noEmit",
     "probe": "tsx scripts/probe-gl.ts",
     "determinism": "tsx scripts/determinism.ts",
-    "validate-springs": "tsx scripts/validateSprings.ts"
+    "validate-springs": "tsx scripts/validateSprings.ts",
+    "stills": "tsx scripts/stills.ts"
   },
   "allowScripts": {
     "esbuild": false
