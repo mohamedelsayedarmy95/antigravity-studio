@@ -31,6 +31,8 @@ export function applyEase(ease: Ease, elapsed: number, duration: number, fps: nu
     return appSpring({ frame: elapsed * fps, fps, preset: ease, durationInFrames: duration * fps });
   }
   const p = Math.min(1, elapsed / duration);
+  // Exponential eases only approach 1 (out(exp)(1) = 0.999); land exactly on the target value.
+  if (p >= 1) return 1;
   if (ease === "linear") return p;
   if (ease === "smooth") return smooth(p);
   if (ease === "expoOut") return expoOut(p);

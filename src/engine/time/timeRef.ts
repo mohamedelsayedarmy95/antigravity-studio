@@ -18,6 +18,8 @@ export const TimeRefSchema = z.union([
   z.templateLiteral([z.number(), "b"]),
   z.templateLiteral([z.number(), "%"]),
   z.templateLiteral(["bar ", z.number()]),
+  /** Marker, optionally offset: "@drop", "@scene:hud+2b", "@logo-0.5s". */
+  z.templateLiteral(["@", z.string()]),
 ]);
 export type TimeRef = z.infer<typeof TimeRefSchema>;
 
@@ -38,7 +40,11 @@ export interface TimeContext {
   sceneStart: number;
   /** Scene length, seconds. */
   sceneLength: number;
+  /** Named markers, absolute seconds (scene:<id>, scene:<id>:end, film and scene markers). */
+  markers?: Readonly<Record<string, number>>;
 }
+
+const MARKER = /^@([A-Za-z0-9_:.-]+?)(?:([+-])(\d+(?:\.\d+)?)(s|f|b))?$/;
 
 const NUM = String.raw`(-?\d+(?:\.\d+)?)`;
 const SUFFIX = new RegExp(`^${NUM}(s|f|b|%)$`);
@@ -63,6 +69,21 @@ export function lengthToSeconds(length: Length, fps: number, grid: BeatGrid): nu
 /** Resolves a TimeRef to seconds relative to the scene start. */
 export function resolveTimeRef(ref: TimeRef, ctx: TimeContext): number {
   if (typeof ref === "number") return ref;
+  if (ref.startsWith("@")) {
+    const m = MARKER.exec(ref);
+    if (!m) throw new Error(`Invalid marker reference "${ref}". Use "@name", "@name+2b" or "@name-0.5s".`);
+    const at = ctx.markers?.[m[1]];
+    if (at === undefined) {
+      const known = Object.keys(ctx.markers ?? {}).join(", ") || "none";
+      throw new Error(`Unknown marker "@${m[1]}". Known markers: ${known}.`);
+    }
+    let offset = 0;
+    if (m[2]) {
+      const n = Number(m[3]) * (m[2] === "-" ? -1 : 1);
+      offset = m[4] === "s" ? n : m[4] === "f" ? n / ctx.fps : beatsToSeconds(ctx.grid, n);
+    }
+    return at + offset - ctx.sceneStart;
+  }
   const bar = BAR_AT.exec(ref);
   if (bar) {
     const absolute = ctx.grid.offset + beatsToSeconds(ctx.grid, (Number(bar[1]) - 1) * ctx.grid.beatsPerBar);
