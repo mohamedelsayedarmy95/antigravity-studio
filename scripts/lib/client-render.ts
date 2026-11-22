@@ -12,6 +12,7 @@ import { ASPECTS, type AspectId } from "../../src/stage3d/schema";
 import { copyWithoutAccessUpdate, editorialSource, isWithin, mediaDirectory, mediaSha256, type scanProject } from "./client-media";
 import { bundleProject, ROOT } from "./remotion";
 import { muxEditorialAudio, prepareEditorialAudio, verifyEditorialAudio } from "./editorial-audio";
+import { makeMasterReviewSheet, masterReviewFrames } from "./master-review";
 
 type Plan = ReturnType<typeof planProject>;
 type Manifest = Awaited<ReturnType<typeof scanProject>>;
@@ -187,6 +188,7 @@ export async function renderClient(input: {
     const publicRoot = path.join(bundleDir, "public");
     const screens = await prepareScreens(project, plan, manifest, scratch, publicRoot);
     const files = [];
+    const reviewSheets: Array<{ aspect: AspectId; filename: string; frames: number[]; sha256: string }> = [];
     const editorial = plan.editorial;
     const logoFile = "factory-brand.png";
     let logoSha256: string | undefined;
@@ -203,6 +205,7 @@ export async function renderClient(input: {
     }
     const bed = editorial && !frames && !frameRange ? await prepareEditorialAudio({
       project, scratch, file: editorial.audio.file, gainDb: editorial.audio.gainDb, totalFrames: plan.totalFrames, fps,
+      effects: editorial.resolvedSoundCues,
     }) : undefined;
     for (const aspect of aspects) {
       const inputProps: FilmProps = { spec: plan.filmSpec, aspect, screens,
@@ -230,19 +233,27 @@ export async function renderClient(input: {
         }
         const qa = frame === undefined ? verifyFactoryMp4(file, aspect, fps, videoFrames, bed !== undefined, h264Profile ?? undefined) : null;
         files.push({ aspect, filename, sha256: await mediaSha256(file), elapsedSeconds: (Date.now() - start) / 1000, qa });
+        if (frame === undefined && profile === "master" && !frameRange) {
+          const reviewFrames = masterReviewFrames(plan.shots);
+          const sheetFilename = "review-" + aspect + ".png";
+          const sheetFile = path.join(scratch, sheetFilename);
+          makeMasterReviewSheet(file, sheetFile, aspect, reviewFrames);
+          reviewSheets.push({ aspect, filename: sheetFilename, frames: [...reviewFrames], sha256: await mediaSha256(sheetFile) });
+        }
       }
       console.log("Rendered " + aspect + " in " + ((Date.now() - start) / 1000).toFixed(2) + "s");
     }
     const delivery = path.join(scratch, "delivery");
     await mkdir(delivery);
     for (const file of files) await rename(path.join(scratch, file.filename), path.join(delivery, file.filename));
+    for (const sheet of reviewSheets) await rename(path.join(scratch, sheet.filename), path.join(delivery, sheet.filename));
     const receipt = {
       schemaVersion: "1", profile, frame: frames?.length === 1 ? frames[0] : null, rightsDeclaration: brief.renderRights,
       ...(frames && frames.length > 1 ? { frames } : {}),
       ...(!frames ? { encoder } : {}),
       ...(frameRange ? { sourceFrameRange: { start: frameRange[0], endInclusive: frameRange[1], frameCount: videoFrames } } : {}),
-      ...(editorial ? { editorial: { ...editorial, logoSha256, ...(bed ? { audioSha256: bed.sourceSha256 } : {}) } } : {}),
-      files, shots: plan.shots, screens: Object.fromEntries(Object.entries(screens).map(([id, screen]) => {
+      ...(editorial ? { editorial: { ...editorial, logoSha256, ...(bed ? { audioSha256: bed.sourceSha256, soundCueSources: bed.effects } : {}) } } : {}),
+      files, ...(reviewSheets.length ? { reviewSheets } : {}), shots: plan.shots, screens: Object.fromEntries(Object.entries(screens).map(([id, screen]) => {
         const { width, height, frameCount } = screen;
         return [id, { width, height, frameCount }];
       })),

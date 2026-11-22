@@ -126,3 +126,36 @@ test("rejects traversal, linked directories, and out-of-range gain", async (t) =
   await symlink(location.scratch, path.join(location.audio, "linked"), process.platform === "win32" ? "junction" : "dir");
   await assert.rejects(prepareEditorialAudio({ ...location, file: "linked/outside.wav", gainDb: -6 }), /links or junctions/i);
 });
+
+
+test("opt-in licensed shot cues mix at a frame-derived sample offset without altering video duration", ffmpegTest, async (t) => {
+  const location = await fixtures(t);
+  await writeFile(path.join(location.audio, "bed.wav"), tone(3, 0.035));
+  const accent = tone(0.20, 0.23);
+  await writeFile(path.join(location.audio, "accent.wav"), accent);
+  const prepared = await prepareEditorialAudio({ ...location, file: "bed.wav", gainDb: -6,
+    effects: [{ file: "accent.wav", startFrame: 30, gainDb: -4 }] });
+  assert.deepEqual(prepared.effects, [{ file: "accent.wav", startFrame: 30,
+    sourceSha256: createHash("sha256").update(accent).digest("hex") }]);
+  const result = verifyEditorialAudio(prepared.file, 61 / 30);
+  assert.equal(result.durationSeconds, 61 / 30);
+  assert.ok(result.truePeakDbtp <= -1);
+  const pcm = execFileSync("ffmpeg", ["-nostdin", "-v", "error", "-i", prepared.file, "-f", "f32le", "-"],
+    { windowsHide: true, maxBuffer: 2 * 1024 * 1024 });
+  const peak = (start: number, count = 1200) => {
+    let value = 0;
+    for (let i = start; i < start + count; i++) value = Math.max(value, Math.abs(pcm.readFloatLE(i * 8)));
+    return value;
+  };
+  assert.ok(peak(51000) > peak(36000) * 2, "the sound accent must arrive near its 1-second cue");
+  await assert.rejects(prepareEditorialAudio({ ...location, file: "bed.wav", gainDb: -6,
+    effects: [{ file: "accent.wav", startFrame: 61, gainDb: -4 }] }), /startFrame/i);
+});
+
+test("rejects a short soundtrack bed even when a later sound cue is declared", ffmpegTest, async (t) => {
+  const location = await fixtures(t);
+  await writeFile(path.join(location.audio, "short-bed.wav"), tone(0.8));
+  await writeFile(path.join(location.audio, "late-cue.wav"), tone(0.2));
+  await assert.rejects(prepareEditorialAudio({ ...location, file: "short-bed.wav", gainDb: -6,
+    effects: [{ file: "late-cue.wav", startFrame: 45, gainDb: -4 }] }), /bed is too short/i);
+});

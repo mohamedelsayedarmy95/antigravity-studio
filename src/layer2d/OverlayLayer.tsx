@@ -9,6 +9,7 @@ import { aspectOf, elementBox, safeRect, typeStyle } from "./layout";
 import { screenViewport } from "../engine/client/screen";
 import { editorialLayout, type EditorialBinding } from "../engine/client/editorial";
 import { TextView } from "./text/TextView";
+import { editorialContinuityOpacity } from "../engine/client/shot-continuity";
 
 /**
  * The 2D layer above the 3D stage. Each element lives in its own Sequence (local frame 0 = its
@@ -44,8 +45,9 @@ const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkS
   const { fps, width, height } = useVideoConfig();
   const el = o.element;
   const box = useRef<HTMLDivElement>(null);
-  const layout = editorial && editorialLayout(aspectOf(width, height), { width, height }, o.sceneId, editorial.safeAreas, editorial.template);
-  const region = layout && (el.id === "eyebrow" || el.id === "headline" || el.id === "body" || el.id === "action") ? layout[el.id] : undefined;
+  const layout = editorial && editorialLayout(aspectOf(width, height), { width, height }, o.sceneId, editorial.safeAreas, editorial.template, editorial.motion);
+  const regionId = el.id === "result-headline" ? "headline" : el.id === "result-body" ? "body" : el.id;
+  const region = layout && (regionId === "eyebrow" || regionId === "headline" || regionId === "body" || regionId === "action") ? layout[regionId] : undefined;
   useLayoutEffect(() => {
     if (!checkScreenClearance || !box.current) return;
     const film = box.current.closest("[data-factory-film]")?.getBoundingClientRect();
@@ -79,6 +81,10 @@ const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkS
     width: region.width, align: layout.align,
   } : elementBox(el, { width, height });
   const exit = el.exit === "none" ? 0 : applyEase("smooth", frame / fps - (o.outSec - o.inSec), EXIT_SECONDS, fps);
+  const directed = editorial?.template === "studio-cut-v2" && editorial.motion === "expressive";
+  const sceneIndex = directed ? compiled.stage.scenes.findIndex((s) => s.id === o.sceneId) : -1;
+  const continuity = directed
+    ? editorialContinuityOpacity(compiled.stage.scenes, sceneIndex, (Math.round(o.inSec * fps) + frame) / fps) : 1;
   const shift = (el.exit === "rise" ? -1 : el.exit === "sink" ? 1 : 0) * exit * Math.min(width, height) * 0.03;
   const ctx = { look: compiled.look, palette: compiled.palette, grid: compiled.stage.grid };
 
@@ -91,9 +97,10 @@ const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkS
   const justify = align === "start" ? "flex-start" : align === "end" ? "flex-end" : "center";
   const action = el.id === "action" && editorial?.template === "studio-cut-v2";
   const pill = action ? { padding: "11px 29px", border: "1.5px solid #eef3fa", borderRadius: 100,
-    backgroundColor: "#deebfa" } : undefined;
+    backgroundColor: "#deebfa",
+    ...(editorial?.motion === "expressive" ? { boxShadow: "0 12px 34px #050e2640" } : {}) } : undefined;
   return (
-    <div style={{ ...style, display: "flex", justifyContent: justify, opacity: 1 - exit }}>
+    <div style={{ ...style, display: "flex", justifyContent: justify, opacity: (1 - exit) * continuity }}>
       <div ref={box} style={{ transform: `translateY(${shift}px)`, ...pill }}>{content}</div>
     </div>
   );
@@ -107,7 +114,16 @@ const LoadedOverlay: React.FC<OverlayProps> = ({ compiled, checkScreenClearance,
   if (!ready) return null;
   const show = (o: PlannedOverlay, flow = false) => {
     const from = Math.round(o.inSec * fps);
-    const end = Math.round(o.endSec * fps);
+    let end = Math.round(o.endSec * fps);
+    // Compiler closes exit:none copy when the 3D transition starts. Keep it until the
+    // nominal cut, fading on the same window as the product screen, not vanishing abruptly.
+    if (editorial?.template === "studio-cut-v2" && editorial.motion === "expressive" && o.element.exit === "none" && o.element.out === undefined) {
+      const index = compiled.stage.scenes.findIndex((s) => s.id === o.sceneId);
+      const next = compiled.stage.scenes[index + 1];
+      if (next?.transitionIn && Math.abs(o.endSec - next.transitionIn.start) < 1 / fps) {
+        end = Math.round(next.start * fps);
+      }
+    }
     return (
       <Sequence key={o.key} from={from} durationInFrames={Math.max(1, end - from)} layout="none" name={o.key}>
         <ElementFrame o={o} compiled={compiled} checkScreenClearance={checkScreenClearance} editorial={editorial} flow={flow} />
@@ -119,7 +135,7 @@ const LoadedOverlay: React.FC<OverlayProps> = ({ compiled, checkScreenClearance,
       {editorial ? compiled.stage.scenes.map((scene) => {
         const overlays = compiled.overlays.filter((o) => o.sceneId === scene.id);
         if (scene.id === "cta") return overlays.map((overlay) => show(overlay));
-        const { eyebrow } = editorialLayout(aspectOf(width, height), { width, height }, scene.id, editorial.safeAreas, editorial.template);
+        const { eyebrow } = editorialLayout(aspectOf(width, height), { width, height }, scene.id, editorial.safeAreas, editorial.template, editorial.motion);
         return (
           <div key={scene.id} data-editorial-copy="" style={{ position: "absolute", left: eyebrow.left, top: eyebrow.top, width: eyebrow.width,
             display: "flex", flexDirection: "column", gap: Math.min(width, height) * 0.021 }}>

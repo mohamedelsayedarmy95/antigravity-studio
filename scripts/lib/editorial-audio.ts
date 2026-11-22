@@ -83,7 +83,15 @@ export function verifyEditorialAudio(file: string, seconds: number) {
   };
 }
 
-export async function prepareEditorialAudio(input: { project: string; scratch: string; file: string; gainDb: number; totalFrames: number; fps: number }) {
+export interface EditorialSoundEffect {
+  file: string;
+  gainDb: number;
+  /** Absolute start frame in the final picture; sample offset is derived from fps. */
+  startFrame: number;
+}
+
+export async function prepareEditorialAudio(input: { project: string; scratch: string; file: string; gainDb: number;
+  totalFrames: number; fps: number; effects?: readonly EditorialSoundEffect[] }) {
   const { file, gainDb, totalFrames, fps } = input;
   if (!isPortablePath(file)) throw new Error("Editorial audio must use a portable path relative to " + audioRoot);
   if (!Number.isFinite(gainDb) || gainDb < -24 || gainDb > 0) throw new Error("Editorial audio gainDb must be between -24 and 0");
@@ -92,6 +100,19 @@ export async function prepareEditorialAudio(input: { project: string; scratch: s
   }
   const seconds = totalFrames / fps;
   const samples = targetSamples(seconds);
+  const effects = input.effects ?? [];
+  if (effects.length > 8) throw new Error("Editorial sound design supports up to eight cues");
+  for (const effect of effects) {
+    if (!isPortablePath(effect.file) || !demuxers.has(path.extname(effect.file).toLowerCase())) {
+      throw new Error("Sound cue must use a portable local audio file in " + audioRoot);
+    }
+    if (!Number.isFinite(effect.gainDb) || effect.gainDb < -36 || effect.gainDb > 0) {
+      throw new Error("Sound cue gainDb must be between -36 and 0");
+    }
+    if (!Number.isSafeInteger(effect.startFrame) || effect.startFrame < 0 || effect.startFrame >= totalFrames) {
+      throw new Error("Sound cue startFrame must be within the final video");
+    }
+  }
   const demuxer = demuxers.get(path.extname(file).toLowerCase());
   if (!demuxer) throw new Error(file + ": use a local WAV, MP3, M4A, AAC, FLAC, Ogg or Opus audio file");
   const project = await realpath(input.project);
@@ -113,6 +134,28 @@ export async function prepareEditorialAudio(input: { project: string; scratch: s
     if (!streams.length) throw new Error(file + ": no audio stream was found");
     const sourceArgs = ["-nostdin", "-v", "error", "-xerror", "-err_detect", "explode", ...localInput(snapshot, demuxer), "-map", "0:a:0"];
     run("ffmpeg", [...sourceArgs, "-f", "null", "-"], "Cannot fully decode editorial audio " + file);
+    const effectSources: Array<{ file: string; sourceSha256: string; startFrame: number }> = [];
+    const effectInputs: Array<{ snapshot: string; demuxer: string; samplesOffset: number; gainDb: number }> = [];
+    for (const [index, effect] of effects.entries()) {
+      const original = await editorialSource(project, "audio", effect.file);
+      const effectSnapshot = path.join(work, `effect-${index}`);
+      if (process.platform === "win32") {
+        const [failure] = copyWithoutAccessUpdate([{ source: original, target: effectSnapshot }]);
+        if (failure) throw new Error(effect.file + ": " + failure.message);
+      } else {
+        await copyFile(original, effectSnapshot, constants.COPYFILE_EXCL);
+      }
+      const format = demuxers.get(path.extname(effect.file).toLowerCase())!;
+      if (!audioStreams(effectSnapshot, format, "Cannot inspect sound cue " + effect.file).length) {
+        throw new Error(effect.file + ": no audio stream was found");
+      }
+      run("ffmpeg", ["-nostdin", "-v", "error", "-xerror", "-err_detect", "explode",
+        ...localInput(effectSnapshot, format), "-map", "0:a:0", "-f", "null", "-"],
+      "Cannot fully decode sound cue " + effect.file);
+      effectInputs.push({ snapshot: effectSnapshot, demuxer: format,
+        samplesOffset: Math.round(effect.startFrame * sampleRate / fps), gainDb: effect.gainDb });
+      effectSources.push({ file: effect.file, sourceSha256: await mediaSha256(effectSnapshot), startFrame: effect.startFrame });
+    }
     const fadeIn = Math.min(12000, Math.floor(samples / 4));
     const fadeOut = Math.min(24000, Math.floor(samples / 4));
     const fade = (type: "in" | "out", start: number, length: number) => `afade=t=${type}:ss=${start}:ns=${length}:curve=qsin`;
@@ -120,11 +163,34 @@ export async function prepareEditorialAudio(input: { project: string; scratch: s
       `aformat=sample_rates=${sampleRate}:channel_layouts=stereo`, `atrim=end_sample=${samples}`, "asetpts=N/SR/TB", `volume=${gainDb}dB`,
       ...(fadeIn ? [fade("in", 0, fadeIn), fade("out", samples - fadeOut, fadeOut)] : []),
     ];
-    run("ffmpeg", [...sourceArgs, "-n", "-af", filters.join(","), "-c:a", "aac", "-b:a", "192k", "-map_metadata", "-1",
-      "-map_chapters", "-1", "-movie_timescale", String(sampleRate), "-use_editlist", "1", output], "Cannot prepare editorial audio " + file);
+    if (effectInputs.length === 0) {
+      // Keep the historical bed-only FFmpeg path byte-for-byte compatible.
+      run("ffmpeg", [...sourceArgs, "-n", "-af", filters.join(","), "-c:a", "aac", "-b:a", "192k", "-map_metadata", "-1",
+        "-map_chapters", "-1", "-movie_timescale", String(sampleRate), "-use_editlist", "1", output], "Cannot prepare editorial audio " + file);
+    } else {
+      // Fully local, licensed clips are independently decoded then placed at sample-accurate shot offsets.
+      // Bed and effects are mixed before the final fades; a restrained limiter guards summed transients.
+      // End with the bed so the duration check can reject a short input instead of accepting a padded tail.
+      const inputs = ["-nostdin", "-v", "error", "-xerror", "-err_detect", "explode",
+        ...localInput(snapshot, demuxer),
+        ...effectInputs.flatMap(({ snapshot: cueFile, demuxer: format }) => localInput(cueFile, format))];
+      const graph = [
+        `[0:a:0]aformat=sample_rates=${sampleRate}:channel_layouts=stereo,atrim=end_sample=${samples},asetpts=N/SR/TB,volume=${gainDb}dB[bed]`,
+        ...effectInputs.map(({ gainDb: cueGain, samplesOffset }, index) =>
+          `[${index + 1}:a:0]aformat=sample_rates=${sampleRate}:channel_layouts=stereo,asetpts=N/SR/TB,` +
+          `volume=${cueGain}dB,adelay=delays=${samplesOffset}S:all=1[cue${index}]`),
+        `[bed]${effectInputs.map((_, index) => `[cue${index}]`).join("")}amix=inputs=${effectInputs.length + 1}:duration=first:` +
+          `dropout_transition=0:normalize=0,alimiter=limit=0.80:attack=5:release=50:level=0:latency=1,` +
+          `atrim=end_sample=${samples},asetpts=N/SR/TB,` +
+          [fade("in", 0, fadeIn), fade("out", samples - fadeOut, fadeOut)].join(",") + `[final]`,
+      ].join(";");
+      run("ffmpeg", [...inputs, "-n", "-filter_complex", graph, "-map", "[final]", "-c:a", "aac", "-b:a", "192k",
+        "-map_metadata", "-1", "-map_chapters", "-1", "-movie_timescale", String(sampleRate), "-use_editlist", "1", output],
+      "Cannot prepare editorial audio with sound cues " + file);
+    }
     verifyEditorialAudio(output, seconds);
     await unlink(snapshot);
-    return { file: output, sourceSha256, gainDb, sampleRate, channels };
+    return { file: output, sourceSha256, gainDb, sampleRate, channels, effects: effectSources };
   } catch (error) {
     await rm(work, { recursive: true, force: true });
     throw error;

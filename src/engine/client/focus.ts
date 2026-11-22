@@ -9,6 +9,13 @@ export const focusTrackSchema = z.array(focusKey).min(1).max(16)
   .refine((track) => track[0]?.at === 0 && track.every((key, i) => i === 0 || key.at > track[i - 1].at),
     "Focus must begin at zero and increase in shot order");
 
+// Explicit product interactions: never infer actionable UI coordinates from a screenshot.
+// A tap is visual feedback only; it never changes a source screenshot or invents a UI result.
+const tapSchema = z.strictObject({ at: unit, x: unit, y: unit });
+const tapsSchema = z.array(tapSchema).max(4).refine((taps) =>
+  taps.every((tap, index) => index === 0 || tap.at - taps[index - 1].at >= 0.11),
+  "Taps must appear in order, at least 0.11 shot-phase apart");
+
 const emphasisSchema = z.strictObject({ from: unit, until: unit, region: regionSchema })
   .refine(({ from, until }) => until > from, "Emphasis must end after it starts");
 
@@ -16,6 +23,7 @@ export const shotDirectionSchema = z.strictObject({
   focus: focusTrackSchema.optional(),
   byRatio: z.strictObject({ "16:9": focusTrackSchema.optional(), "9:16": focusTrackSchema.optional(), "1:1": focusTrackSchema.optional() }).optional(),
   emphasis: z.array(emphasisSchema).max(6).optional(),
+  taps: tapsSchema.optional(),
 });
 
 type Track = z.output<typeof focusTrackSchema>;

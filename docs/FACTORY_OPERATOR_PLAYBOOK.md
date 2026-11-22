@@ -151,6 +151,20 @@ pnpm factory render --project 'D:\My Client Projects\fieldnote' --ratios '16:9,9
 
 Preview retains H.264 CRF 18 with x264 `fast`. The inclusive zero-based `--range` accepts at most 180 frames and produces a picture-only preview. Full `master` jobs require an explicitly 30 fps brief and use native aspect dimensions, H.264 High, CRF 10, x264 `slow`, and limited-range BT.709 YUV 4:2:0. Full editorial jobs include the verified local music bed. The receipt captures encoder settings, video-stream bitrate and verified frame timing. The 30 fps SDR master profile does not qualify 60 fps, HDR, broadcaster, or other platform-specific variants.
 
+### Show an observed result
+
+In expressive Studio Cut v2, an optional `features[].result` replaces the feature's title and body at the actual result frame in a recording. Use `sourceFrame` on the composition-rate source grid, before subtracting the trim start. Supply short `title` and `body` text that the supplied media supports. The plan records both the shot-local and movie frame. A result needs at least 18 preceding frames and 12 frames to read before the next shot. Validation rejects stills, results outside the played trim, and shorter holds.
+
+Keep the recording request and result copy tied to real evidence. For example, place “Assignment saved” on the first source frame where the recording shows the confirmation. Keep the coordinate path and optional tap tied to the source UI. Sound cue offsets must fit inside their declared shot, and the plan records their absolute movie frames. Gear the cue timing to the actual interaction and review the mix in playback.
+
+### Create a local review derivative
+
+```powershell
+pnpm factory deliver --master 'D:\Factory Reports\master-batch\fieldnote-9x16.mp4' --out 'D:\Review Exports'
+```
+
+The command takes a verified factory master with its sibling `render-report.json`. It produces a separate, web-compatible 30 fps SDR review MP4 and a technical receipt. The master remains separate. The review keeps the native output size and the existing audio program where present. Treat scan reports, editorial receipts and media as private work materials. A render declaration is operator evidence for local work. Publication clearance requires a separate rights decision.
+
 ## Review results and failures
 
 - Accepted media extensions are JPG, JPEG, PNG, WebP, MP4, and MOV. Scan records codec, profile, container, dimensions, available rotation and color tags, video duration and average fps, audio stream count, byte count and SHA-256. Byte-identical duplicates point to the earliest path in the sorted catalog. The scan assesses metadata and can detect probe failures. It does not certify full decoding, ICC/EXIF color interpretation, or visual suitability.

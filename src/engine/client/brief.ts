@@ -35,7 +35,15 @@ const editorial = z.strictObject({
   closingLine: copy.optional(),
   closingStatement: copy.optional(),
   logo: assetPath.refine((name) => /\.png$/i.test(name), "Supply a PNG brand mark"),
-  audio: z.strictObject({ file: assetPath, license: copy, gainDb: z.number().min(-24).max(0).default(0) }),
+  // Optional sound-design accents; never synthesized, downloaded or inferred without licensed media.
+  audio: z.strictObject({ file: assetPath, license: copy, gainDb: z.number().min(-24).max(0).default(0),
+    cues: z.array(z.strictObject({
+      file: assetPath, license: copy,
+      atShot: z.enum(["hook", "proposition", "feature-1", "feature-2", "feature-3", "feature-4", "cta"]),
+      offsetFrames: z.number().int().min(0).max(90).default(0),
+      gainDb: z.number().min(-36).max(0).default(-12),
+    })).max(8).optional(),
+  }),
   motion: z.enum(["measured", "expressive"]).default("measured"),
   safeAreas: eachRatio(z.strictObject({ top: inset, right: inset, bottom: inset, left: inset })).optional(),
   heroFraming: eachRatio(presentationSchema).optional(),
@@ -54,6 +62,7 @@ const v2 = z.strictObject({
   features: z.array(z.strictObject({
     title: copy, body: copy, asset: assetPath, trim: trim.optional(), presentation: presentationSchema.optional(),
     framing: eachRatio(presentationSchema).optional(), label: copy.optional(),
+    result: z.strictObject({ sourceFrame: z.number().int().nonnegative(), title: copy, body: copy }).optional(),
   })).min(1).max(6),
   cta: copy,
   assets: z.strictObject({ directory: assetPath.default(defaultAssetDirectory) }).default({ directory: defaultAssetDirectory }),
@@ -67,6 +76,12 @@ const v2 = z.strictObject({
   renderRights: z.strictObject({ origin: z.enum(["synthetic", "client"]), approved: z.literal(true), license: copy, privacy: copy }).optional(),
   editorial: editorial.optional(),
 }).superRefine((value, ctx) => {
+  if (value.editorial?.template !== "studio-cut-v2" || value.editorial.motion !== "expressive") {
+    value.features.forEach((feature, i) => {
+      if (feature.result) ctx.addIssue({ code: "custom", path: ["features", i, "result"],
+        message: "Authored results require expressive Studio Cut v2" });
+    });
+  }
   if (!value.editorial) {
     value.features.forEach((feature, i) => {
       if (feature.framing) ctx.addIssue({ code: "custom", path: ["features", i, "framing"], message: "Select an editorial template to use aspect framing" });
@@ -82,6 +97,12 @@ const v2 = z.strictObject({
   }
   if (value.editorial.template === "studio-cut-v1" && (value.editorial.direction || value.editorial.closingStatement)) {
     ctx.addIssue({ code: "custom", path: ["editorial", "template"], message: "Directed shots and a separate closing statement require studio-cut-v2" });
+  }
+  for (const [index, cue] of (value.editorial.audio.cues ?? []).entries()) {
+    if (cue.atShot.startsWith("feature-") && Number(cue.atShot.slice(8)) > value.features.length) {
+      ctx.addIssue({ code: "custom", path: ["editorial", "audio", "cues", index, "atShot"],
+        message: "Sound cue refers to a feature that is not in this brief" });
+    }
   }
   for (const key of Object.keys(value.editorial.direction ?? {})) {
     if (key.startsWith("feature-") && Number(key.slice(8)) > value.features.length) {

@@ -100,14 +100,18 @@ export function planFilm(input: Film3DInput, markers: Readonly<Record<string, nu
 
 /** What the compositor draws at absolute time t. */
 export function compositeAt(plan: FilmPlan, t: number): FrameComposite {
+  // Frame timestamps use a single division while scene boundaries accumulate. Treat a
+  // sub-nanosecond rounding difference as equality and keep the original motion time.
+  const boundaryTime = t + 1e-9;
   for (const s of plan.scenes) {
     const tr = s.transitionIn;
-    if (tr && t >= tr.start && t < tr.end) {
+    if (tr && boundaryTime >= tr.start && boundaryTime < tr.end) {
       const from = s.index === 0 ? null : plan.scenes[s.index - 1];
-      return { mode: "transition", from, to: s, transition: tr, progress: (t - tr.start) / (tr.end - tr.start) };
+      const progress = Math.max(0, (t - tr.start) / (tr.end - tr.start));
+      return { mode: "transition", from, to: s, transition: tr, progress };
     }
   }
-  const scene = plan.scenes.find((s) => t >= s.start && t < s.start + s.length) ?? plan.scenes[plan.scenes.length - 1];
+  const scene = plan.scenes.find((s) => boundaryTime >= s.start && boundaryTime < s.start + s.length) ?? plan.scenes[plan.scenes.length - 1];
   return { mode: "single", scene };
 }
 

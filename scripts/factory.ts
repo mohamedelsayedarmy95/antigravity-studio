@@ -14,6 +14,7 @@ const usage = [
   "pnpm factory scan --project <folder> [--assets-dir <relative-folder> | --brief <file>] [--out <folder>]",
   "pnpm factory validate --project <folder> [--brief <file>] [--out <folder>]",
   "pnpm factory render --project <folder> [--brief <file>] [--ratios 16:9,9:16,1:1] [--profile preview|master] [--frame <number> | --frames <list> | --range <start>:<end>] [--out <folder>]",
+  "pnpm factory deliver --master <factory master MP4> --out <outside master batch>",
 ].join("\n");
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -63,9 +64,12 @@ async function createProject(name: string, parent?: string) {
   console.log("Edit " + path.join(destination, "brief.json") + " after adding screens to " + path.join(destination, defaultAssetDirectory));
 }
 
-async function loadBrief(file: string, optional: boolean) {
+async function loadBrief(file: string, optional: boolean, implicitProject?: string) {
   let content: string;
   try {
+    if (implicitProject && (!(await lstat(file)).isFile() || !isWithin(implicitProject, await realpath(file)))) {
+      throw new Error("Implicit project brief.json must be a regular file inside the project without links");
+    }
     content = await readFile(file, "utf8");
   } catch (error) {
     if (isMissing(error) && optional) return null;
@@ -79,7 +83,7 @@ async function loadBrief(file: string, optional: boolean) {
   }
 }
 
-async function resolveEvidenceDirectory(project: string, output: string): Promise<string> {
+async function resolveEvidenceDirectory(project: string, output: string, rejectLinks = false): Promise<string> {
   const absolute = path.resolve(output);
   if (isWithin(project, absolute)) throw new Error("Reports must be written outside the input project. Choose a different --out folder.");
   // Resolve the nearest existing ancestor before making directories. This catches links to inputs.
@@ -93,7 +97,9 @@ async function resolveEvidenceDirectory(project: string, output: string): Promis
       ancestor = path.dirname(ancestor);
     }
   }
-  const destination = path.join(await realpath(ancestor), path.relative(ancestor, absolute));
+  const resolvedAncestor = await realpath(ancestor);
+  if (rejectLinks && path.relative(ancestor, resolvedAncestor) !== "") throw new Error("Delivery output may not use links or junctions");
+  const destination = path.join(resolvedAncestor, path.relative(ancestor, absolute));
   if (isWithin(project, destination)) throw new Error("Report destination resolves inside the input project.");
   await mkdir(destination, { recursive: true });
   return destination;
@@ -132,6 +138,17 @@ async function main() {
     await createProject(values.name, values.parent);
     return;
   }
+  if (command === "deliver") {
+    const { values } = parseArgs({ args, options: { master: { type: "string" }, out: { type: "string" } } });
+    if (!values.master || !values.out) throw new Error(usage);
+    const { resolveDeliveryMaster, deliverFactoryMaster } = await import("./lib/delivery");
+    const source = await resolveDeliveryMaster(values.master);
+    const output = await resolveEvidenceDirectory(source.batch, values.out, true);
+    const destination = await deliverFactoryMaster(source, output);
+    console.log("Local review: " + path.join(destination, "review.mp4"));
+    console.log("Delivery report: " + path.join(destination, "delivery-report.json"));
+    return;
+  }
   if (command !== "scan" && command !== "validate" && command !== "render") throw new Error(usage);
 
   const { values } = parseArgs({
@@ -145,7 +162,8 @@ async function main() {
   const project = await realpath(values.project);
   if (!(await lstat(project)).isDirectory()) throw new Error("--project must be a directory");
   const brief = values["assets-dir"] === undefined
-    ? await loadBrief(path.resolve(values.brief ?? path.join(project, "brief.json")), command === "scan" && values.brief === undefined)
+    ? await loadBrief(path.resolve(values.brief ?? path.join(project, "brief.json")),
+      command === "scan" && values.brief === undefined, values.brief === undefined ? project : undefined)
     : null;
   let frames: number[] | undefined;
   let frameRange: FactoryFrameRange | undefined;
@@ -188,7 +206,11 @@ async function main() {
   }
   const plan = planProject(brief.brief, manifest.assets);
   if (plan.editorial) {
-    await Promise.all([editorialSource(project, "logo", plan.editorial.logo), editorialSource(project, "audio", plan.editorial.audio.file)]);
+    const { logo, audio } = plan.editorial;
+    await Promise.all([
+      editorialSource(project, "logo", logo), editorialSource(project, "audio", audio.file),
+      ...(audio.cues ?? []).map(({ file }) => editorialSource(project, "audio", file)),
+    ]);
   }
   await publish(output, "plan", {
     ...plan, sourceBriefVersion: brief.sourceVersion, manifestSha256: sha256(json(manifest)),

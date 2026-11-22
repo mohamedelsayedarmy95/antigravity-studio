@@ -1,7 +1,7 @@
 import { compileFilm } from "../compile/compile";
 import type { FilmSpecInput } from "../schema/film";
 import type { ClientBrief } from "./brief";
-import type { ScreenPresentation } from "./screen";
+import { sourceFrames, type ScreenPresentation } from "./screen";
 import { studioScene } from "./studio-cut";
 
 interface AssetForPlan {
@@ -55,12 +55,32 @@ export function planProject(brief: ClientBrief, assets: readonly AssetForPlan[])
   const totalFrames = brief.durationSeconds * brief.fps;
   let fraction = 0;
   let start = 0;
+  const results = new Map<string, NonNullable<ClientBrief["features"][number]["result"]> & { localFrame: number; movieFrame: number }>();
   const timeline: FilmSpecInput["timeline"] = beats.map((beat, index) => {
     fraction += beat.weight;
     const end = index === beats.length - 1 ? totalFrames : Math.round(totalFrames * fraction);
-    const length = ((end - start) + "f") as `${number}f`;
+    const shotFrames = end - start;
+    const length = `${shotFrames}f` as const;
+    const shotStart = start;
     start = end;
-    if (studio) return studioScene(beat, length, studio.motion, studio.template, studio.closingStatement);
+    if (studio) {
+      const featureIndex = beat.id.startsWith("feature-") ? Number(beat.id.slice(8)) - 1 : -1;
+      const result = brief.features[featureIndex]?.result;
+      if (result) {
+        const label = `features.${featureIndex}.result`;
+        if (beat.asset?.kind !== "video" || !beat.asset.sourceRange) throw new Error(label + " requires a recording");
+        const source = sourceFrames(beat.asset.sourceRange, brief.fps, shotFrames);
+        const localFrame = result.sourceFrame - source.start;
+        if (result.sourceFrame < source.start || result.sourceFrame >= source.end) {
+          throw new Error(label + " frame is outside the recording trim shown in this shot");
+        }
+        if (localFrame < 18 || shotFrames - localFrame < 12) {
+          throw new Error(label + " needs 18 frames of setup and 12 frames of readable result");
+        }
+        results.set(beat.id, { ...result, localFrame, movieFrame: shotStart + localFrame });
+      }
+      return studioScene(beat, length, studio.motion, studio.template, studio.closingStatement, results.get(beat.id));
+    }
     return {
       id: beat.id, length, transitionIn: { type: "cut" },
       overlay: [
@@ -77,6 +97,20 @@ export function planProject(brief: ClientBrief, assets: readonly AssetForPlan[])
     timeline,
   } satisfies FilmSpecInput;
   const compiled = compileFilm(spec);
+  const shots = compiled.stage.scenes.map((scene, index) => ({
+    id: scene.id,
+    startFrame: Math.round(scene.start * compiled.fps),
+    durationFrames: Math.round(scene.length * compiled.fps),
+    asset: beats[index].asset,
+    ...(results.has(scene.id) ? { result: results.get(scene.id) } : {}),
+  }));
+  const soundCues = studio?.audio.cues?.map((cue) => {
+    const shot = shots.find((item) => item.id === cue.atShot);
+    if (!shot || cue.offsetFrames >= shot.durationFrames) {
+      throw new Error(`Sound cue ${cue.file} is outside its named shot ${cue.atShot}`);
+    }
+    return { file: cue.file, gainDb: cue.gainDb, startFrame: shot.startFrame + cue.offsetFrames };
+  });
   return {
     schemaVersion: "1" as const,
     purpose: "ingestion-plan" as const,
@@ -88,13 +122,9 @@ export function planProject(brief: ClientBrief, assets: readonly AssetForPlan[])
       template: studio.template, logo: studio.logo, audio: studio.audio, motion: studio.motion,
       safeAreas: byAspect(studio.safeAreas),
       ...(studio.direction ? { direction: studio.direction } : {}),
-      cues: compiled.stage.scenes.map((scene) => ({ scene: scene.id, frame: Math.round(scene.start * compiled.fps) })),
+      ...(soundCues?.length ? { resolvedSoundCues: soundCues } : {}),
+      cues: shots.map((shot) => ({ scene: shot.id, frame: shot.startFrame })),
     } } : {}),
-    shots: compiled.stage.scenes.map((scene, index) => ({
-      id: scene.id,
-      startFrame: Math.round(scene.start * compiled.fps),
-      durationFrames: Math.round(scene.length * compiled.fps),
-      asset: beats[index].asset,
-    })),
+    shots,
   };
 }

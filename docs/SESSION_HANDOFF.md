@@ -2,6 +2,13 @@
 
 2026-11-22, Africa/Cairo. The checkout is D:/AntiGravity/Studio/studio-engine on engine/v1. Package 4 adds local audio at a1bc1f17ca2e9b7d11a481d40f300b23db5cd5a0 and the Studio Cut template at fed1744159c804f149f9fb12933191fe438fc329. SaveFix originals remain in PROJECTS/SAVEFIX/assets/screenshots and outside Git. No merge, push or history rewrite occurred.
 
+## CPOS independent advancement · CONDITIONAL PASS
+
+- The mission started from HEAD ce3d921b077694a7a3953b9cc865df79ebed1634 with uncommitted Creative Fusion changes. Their starting diff and untracked source are preserved in D:/AntiGravity/Studio/cpos-independent-evidence. The integrated changes remain uncommitted.
+- Expressive Studio Cut v2 now preserves product visibility at cuts and can replace explanatory copy at the observed result frame of a recording. The fix also aligns the stage at floating-point boundaries, rejects misplaced or missing sound cues, and prevents an undersized bed from silently dropping an effect. The Windows snapshot check verifies the path reached by the opened handle. A local derivative command verifies the master and keeps publication clearance unestablished.
+- Fieldnote rendered as three full 14-second native SDR masters. A square Margin excerpt tested a separate synthetic approval workflow. The primary report contains playable files, source-to-result evidence, exact test commands, performance and memory samples, verification limits, and the Git inventory. Start with D:/AntiGravity/Studio/cpos-independent-evidence/CPOS_MISSION_REPORT.md.
+- Real client clearance and creative approval, perceptual audio playback, and named platform delivery profiles remain unverified. The original protected assets and SaveFix have no mission edits. Package 5 remains governed separately.
+
 ## Package 4 corrective pass · UVF-P4-CREATIVE-REMEDIATION-01
 
 - Technical PASS for the corrected three-ratio 30 fps SDR master profile. Director creative approval remains pending. The corrective code is 0af4b5fdcba3b126c91597ad5f322aa2cee644f8. Package 5 is on hold under the director's instruction.

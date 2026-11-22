@@ -66,7 +66,8 @@ vec3 lightSweep(vec2 uv, float p) {
   float extent = 0.5 * (aspect * abs(dir.x) + abs(dir.y));
   float width = 0.065;
   float pos = mix(-extent - width, extent + width, smoothstep(0.0, 1.0, p));
-  float reveal = smoothstep(pos + width * 0.25, pos - width * 0.25, s);
+  // GLSL smoothstep requires ascending edges. Reverse the result, not the edge order.
+  float reveal = 1.0 - smoothstep(pos - width * 0.25, pos + width * 0.25, s);
   float x = (s - pos) / width;
   // Narrow specular core with a soft falloff, like a strip light passing over glass.
   float band = 0.75 * exp(-x * x * 9.0) + 0.2 * exp(-x * x * 1.2);

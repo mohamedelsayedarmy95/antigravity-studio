@@ -15,7 +15,7 @@ export type Anchor = z.infer<typeof AnchorSchema>;
 export const TypeRoleSchema = z.enum(["display", "headline", "title", "body", "label", "numeric"]);
 export type TypeRole = z.infer<typeof TypeRoleSchema>;
 
-export const RevealSchema = z.enum(["maskedRise", "perGlyph", "scramble", "typewriter", "blurIn", "fade"]);
+export const RevealSchema = z.enum(["maskedRise", "perGlyph", "scramble", "typewriter", "blurIn", "fade", "hold"]);
 export type Reveal = z.infer<typeof RevealSchema>;
 
 const Common = {

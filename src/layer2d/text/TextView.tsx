@@ -134,6 +134,7 @@ export const TextView: React.FC<{
   const highlights = el.emphasis.map((text) => ({ text, style: { color: accent } }));
   const container: React.CSSProperties = { ...style, color: ink, textAlign: align === "start" ? "left" : align === "end" ? "right" : "center", textWrap: "balance" };
 
+  if (reveal === "hold") return <div style={container}>{el.content}</div>;
   if (reveal === "scramble") {
     return <div style={container}><Scramble text={el.content} mask={emphasisMask(el.content, el.emphasis)} ink={ink} accent={accent} seed={hashString(`${seed}/${el.content}`)} /></div>;
   }
