@@ -27,6 +27,7 @@ interface ProbeStream {
   duration?: string;
   avg_frame_rate?: string;
   pix_fmt?: string;
+  sample_aspect_ratio?: string;
   color_range?: string;
   color_space?: string;
   color_transfer?: string;
@@ -41,7 +42,7 @@ function probe(file: string, format: string) {
     "-v", "error", "-protocol_whitelist", "file", "-f", format,
     ...(videoContainer ? ["-enable_drefs", "0"] : []),
     "-show_entries",
-    "format=duration,format_name:stream=codec_name,codec_type,profile,width,height,duration,avg_frame_rate,pix_fmt,color_range,color_space,color_transfer,color_primaries:stream_disposition=attached_pic:stream_side_data=rotation",
+    "format=duration,format_name:stream=codec_name,codec_type,profile,width,height,duration,avg_frame_rate,pix_fmt,sample_aspect_ratio,color_range,color_space,color_transfer,color_primaries:stream_disposition=attached_pic:stream_side_data=rotation",
     "-of", "json", "-i", file,
   ];
   const result = spawnSync("ffprobe", args, { encoding: "utf8", windowsHide: true, timeout: 30000 });
@@ -66,6 +67,8 @@ function probe(file: string, format: string) {
     displayWidth: rotated ? stream.height : stream.width,
     displayHeight: rotated ? stream.width : stream.height,
     rotation,
+    ...(stream.sample_aspect_ratio && !["1:1", "N/A", "0:1"].includes(stream.sample_aspect_ratio)
+      ? { sampleAspectRatio: stream.sample_aspect_ratio } : {}),
     durationSeconds: videoContainer ? duration : null,
     fps: videoContainer && Number.isFinite(fps) && fps > 0 ? fps : null,
     audioStreams: data.streams.filter((item) => item.codec_type === "audio").length,
@@ -93,10 +96,19 @@ export async function mediaDirectory(project: string, directory: string): Promis
   return current;
 }
 
-async function sha256(file: string) {
+export async function mediaSha256(file: string) {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(file)) hash.update(chunk);
   return hash.digest("hex");
+}
+
+export function copyWithoutAccessUpdate(files: { source: string; target: string }[]) {
+  const helper = fileURLToPath(new URL("./snapshot-media.ps1", import.meta.url));
+  const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", helper], {
+    input: JSON.stringify(files), encoding: "utf8", windowsHide: true, timeout: 600000,
+  });
+  if (result.status !== 0) throw new Error("Access-preserving Windows scan failed: " + (result.error?.message ?? result.stderr.trim()));
+  return JSON.parse(result.stdout) as { index: number; message: string }[];
 }
 
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
@@ -155,12 +167,7 @@ export async function scanProject(project: string, directory: string, scratchRoo
     }));
     const eligible = jobs.filter((item) => !snapshotFailures.has(item.index));
     if (scratch && eligible.length) {
-      const helper = fileURLToPath(new URL("./snapshot-media.ps1", import.meta.url));
-      const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-File", helper], {
-        input: JSON.stringify(eligible), encoding: "utf8", windowsHide: true, timeout: 600000,
-      });
-      if (result.status !== 0) throw new Error("Access-preserving Windows scan failed: " + (result.error?.message ?? result.stderr.trim()));
-      const failures = JSON.parse(result.stdout) as { index: number; message: string }[];
+      const failures = copyWithoutAccessUpdate(eligible);
       for (const failure of failures) snapshotFailures.set(eligible[failure.index].index, failure.message);
     }
     for (const [i, item] of jobs.entries()) {
@@ -172,7 +179,7 @@ export async function scanProject(project: string, directory: string, scratchRoo
       }
       try {
         const media = probe(item.target, item.format);
-        const hash = await sha256(item.target);
+        const hash = await mediaSha256(item.target);
         const { size } = await lstat(item.target);
         const after = await lstat(item.source);
         if (!after.isFile() || after.size !== before.size || after.mtimeMs !== before.mtimeMs || size !== before.size) {

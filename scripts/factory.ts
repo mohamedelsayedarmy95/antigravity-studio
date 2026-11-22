@@ -4,6 +4,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { defaultAssetDirectory, isPortablePath, parseBrief, starterBrief } from "../src/engine/client/brief";
 import { planProject } from "../src/engine/client/plan";
+import type { AspectId } from "../src/stage3d/schema";
 import { isWithin, scanProject } from "./lib/client-media";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -11,6 +12,7 @@ const usage = [
   "pnpm factory init --name <new-project> --template mobile-app [--parent <folder>]",
   "pnpm factory scan --project <folder> [--assets-dir <relative-folder> | --brief <file>] [--out <folder>]",
   "pnpm factory validate --project <folder> [--brief <file>] [--out <folder>]",
+  "pnpm factory render --project <folder> [--brief <file>] [--ratios 16:9,9:16,1:1] [--profile preview] [--frame <number>] [--out <folder>]",
 ].join("\n");
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -121,17 +123,26 @@ async function main() {
     await createProject(values.name, values.parent);
     return;
   }
-  if (command !== "scan" && command !== "validate") throw new Error(usage);
+  if (command !== "scan" && command !== "validate" && command !== "render") throw new Error(usage);
 
   const { values } = parseArgs({
-    args, options: { project: { type: "string" }, brief: { type: "string" }, "assets-dir": { type: "string" }, out: { type: "string" } },
+    args, options: {
+      project: { type: "string" }, brief: { type: "string" }, "assets-dir": { type: "string" }, out: { type: "string" },
+      ratios: { type: "string" }, profile: { type: "string" }, frame: { type: "string" },
+    },
   });
-  if (!values.project || (values["assets-dir"] !== undefined && (command === "validate" || values.brief !== undefined))) throw new Error(usage);
+  if (!values.project || (values["assets-dir"] !== undefined && (command !== "scan" || values.brief !== undefined)) ||
+      (command !== "render" && (values.ratios !== undefined || values.profile !== undefined || values.frame !== undefined))) throw new Error(usage);
   const project = await realpath(values.project);
   if (!(await lstat(project)).isDirectory()) throw new Error("--project must be a directory");
   const brief = values["assets-dir"] === undefined
     ? await loadBrief(path.resolve(values.brief ?? path.join(project, "brief.json")), command === "scan" && values.brief === undefined)
     : null;
+  if (command === "render") {
+    if (!brief?.brief.renderRights) throw new Error("Render requires a renderRights declaration in the brief covering licensing and privacy");
+    if (values.profile !== undefined && values.profile !== "preview") throw new Error("Package 3 supports --profile preview");
+    if (values.frame !== undefined && !/^(?:0|[1-9]\d*)$/.test(values.frame)) throw new Error("--frame must be a nonnegative frame index");
+  }
   const assetDirectory = (values["assets-dir"] ?? brief?.brief.assets.directory ?? defaultAssetDirectory).replaceAll("\\", "/");
   if (!isPortablePath(assetDirectory)) throw new Error("Asset directory must be a portable project-relative path.");
   const output = await resolveEvidenceDirectory(project, values.out ?? path.join(root, "out", "factory", sha256(project).slice(0, 16)));
@@ -154,7 +165,19 @@ async function main() {
     ...plan, sourceBriefVersion: brief.sourceVersion, manifestSha256: sha256(json(manifest)),
     clearance: { licensing: manifest.analysis.licensing, privacy: manifest.analysis.privacy },
   });
-  console.log("Validated " + plan.shots.length + " shots and " + plan.totalFrames + " frames. This plan does not render media.");
+  console.log("Validated " + plan.shots.length + " shots and " + plan.totalFrames + " frames.");
+  if (command !== "render") return;
+
+  const aspects = values.ratios === undefined ? plan.filmSpec.output.aspects :
+    values.ratios.split(",").map((ratio) => {
+      if (!brief.brief.aspectRatios.some((allowed) => allowed === ratio)) throw new Error("Ratio is outside the brief: " + ratio);
+      return ratio.replace(":", "x") as AspectId;
+    });
+  if (new Set(aspects).size !== aspects.length) throw new Error("List each render ratio once");
+  const frame = values.frame === undefined ? undefined : Number(values.frame);
+  if (frame !== undefined && frame >= plan.totalFrames) throw new Error("--frame is outside the validated timeline");
+  const { renderClient } = await import("./lib/client-render");
+  await renderClient({ project, output, brief: brief.brief, plan, manifest, aspects, frame });
 }
 
 main().catch((error: Error) => {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LookIdSchema } from "../../looks";
+import { presentationSchema } from "./screen";
 
 export const defaultAssetDirectory = "assets/screenshots";
 const windowsDevice = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$)(?:\.|$)/i;
@@ -28,7 +29,10 @@ const v2 = z.strictObject({
   brand: z.strictObject({ name: copy, color }),
   hook: copy,
   hero: assetPath,
-  features: z.array(z.strictObject({ title: copy, body: copy, asset: assetPath, trim: trim.optional() })).min(1).max(6),
+  heroPresentation: presentationSchema.optional(),
+  features: z.array(z.strictObject({
+    title: copy, body: copy, asset: assetPath, trim: trim.optional(), presentation: presentationSchema.optional(),
+  })).min(1).max(6),
   cta: copy,
   assets: z.strictObject({ directory: assetPath.default(defaultAssetDirectory) }).default({ directory: defaultAssetDirectory }),
   locale: z.string().refine((value) => {
@@ -38,6 +42,7 @@ const v2 = z.strictObject({
   durationSeconds: z.number().int().min(6).max(90).default(15),
   fps: z.union([z.literal(30), z.literal(60)]).default(60),
   aspectRatios: ratios.default(["9:16", "16:9", "1:1"]),
+  renderRights: z.strictObject({ origin: z.enum(["synthetic", "client"]), approved: z.literal(true), license: copy, privacy: copy }).optional(),
 });
 
 // The flat v1 interchange format names its ordered catalog "screenshots".

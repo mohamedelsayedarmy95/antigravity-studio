@@ -2,23 +2,29 @@ import React, { useMemo } from "react";
 import { AbsoluteFill, useVideoConfig } from "remotion";
 import { ThreeCanvas } from "@remotion/three";
 import { OverlayLayer } from "../layer2d/OverlayLayer";
+import { ScreenLayer } from "../layer2d/ScreenLayer";
 import { Stage } from "../stage3d/Stage";
 import { compileFilm } from "./compile/compile";
 import type { FilmSpecInput } from "./schema/film";
+import type { BoundScreen } from "./client/screen";
+import type { AspectId } from "../stage3d/schema";
+
+export type FilmProps = { spec: FilmSpecInput; screens?: Record<string, BoundScreen>; aspect?: AspectId };
 
 /**
  * The one composition component. Any FilmSpec, any aspect: the compiler plans it, the 3D stage
  * renders the world, the 2D layer renders type and data on top.
  */
-export const Film: React.FC<{ spec: FilmSpecInput }> = ({ spec }) => {
+export const Film: React.FC<FilmProps> = ({ spec, screens }) => {
   const { width, height } = useVideoConfig();
   const compiled = useMemo(() => compileFilm(spec), [spec]);
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000000" }}>
+    <AbsoluteFill data-factory-film={screens ? "" : undefined} style={{ backgroundColor: "#000000" }}>
       <ThreeCanvas width={width} height={height} flat gl={{ antialias: false, alpha: false, powerPreference: "high-performance", stencil: false }}>
         <Stage plan={compiled.stage} aspect={width / height} />
       </ThreeCanvas>
-      <OverlayLayer compiled={compiled} />
+      {screens ? <ScreenLayer compiled={compiled} screens={screens} /> : null}
+      <OverlayLayer compiled={compiled} checkScreenClearance={screens !== undefined} />
     </AbsoluteFill>
   );
 };

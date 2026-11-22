@@ -8,13 +8,14 @@ export const ROOT = path.resolve(import.meta.dirname, "..", "..");
 export type GlBackend = NonNullable<ChromiumOptions["gl"]>;
 
 /** Bundles src/index.ts the same way the CLI does (Rspack + Tailwind), returning a serve URL. */
-export async function bundleProject(): Promise<string> {
+export async function bundleProject(outDir?: string): Promise<string> {
   const started = Date.now();
   const serveUrl = await bundle({
     entryPoint: path.join(ROOT, "src", "index.ts"),
     bundlerOverride: createBundleOverride(ROOT),
     rspack: true,
-    enableCaching: true,
+    enableCaching: outDir === undefined,
+    outDir,
   });
   console.log(`bundled in ${((Date.now() - started) / 1000).toFixed(1)}s`);
   return serveUrl;

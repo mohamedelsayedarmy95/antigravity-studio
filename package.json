@@ -54,7 +54,8 @@
     "stills": "tsx scripts/stills.ts",
     "factory": "tsx scripts/factory.ts",
     "test": "tsx --test tests/*.test.ts",
-    "test:factory": "tsx --test tests/factory.integration.ts"
+    "test:factory": "tsx --test tests/factory.integration.ts",
+    "test:factory-render": "tsx --test tests/factory-render.integration.ts"
   },
   "allowScripts": {
     "esbuild": false

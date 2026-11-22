@@ -1,7 +1,7 @@
 import "./index.css";
 import { Composition, Folder } from "remotion";
 import { compileFilm } from "./engine/compile/compile";
-import { Film } from "./engine/Film";
+import { Film, type FilmProps } from "./engine/Film";
 import { FILMS } from "./films";
 import { GpuProbe } from "./probe/GpuProbe";
 import { ASPECTS } from "./stage3d/schema";
@@ -29,6 +29,21 @@ export const RemotionRoot: React.FC = () => {
           </Folder>
         );
       })}
+      <Composition
+        id="FactoryFilm"
+        component={Film}
+        durationInFrames={1}
+        fps={60}
+        width={1920}
+        height={1080}
+        defaultProps={{ spec: FILMS[0] } satisfies FilmProps}
+        calculateMetadata={({ props }: { props: FilmProps }) => {
+          const compiled = compileFilm(props.spec);
+          const aspect = props.aspect ?? compiled.spec.output.aspects[0];
+          if (!compiled.spec.output.aspects.includes(aspect)) throw new Error("Aspect is outside the validated factory plan");
+          return { ...ASPECTS[aspect], durationInFrames: compiled.durationInFrames, fps: compiled.fps };
+        }}
+      />
       <Folder name="Diagnostics">
         <Composition id="GpuProbe" component={GpuProbe} durationInFrames={60} fps={60} width={1280} height={720} />
       </Folder>

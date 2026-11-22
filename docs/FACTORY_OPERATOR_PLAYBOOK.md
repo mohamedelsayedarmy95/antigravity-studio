@@ -1,12 +1,13 @@
 # Factory project setup and validation
 
-Package 2 supports local project setup, media inventory, and a timing plan from the FilmSpec compiler. The workflow ends at a validated plan. The render adapter, media normalization, finishing, and delivery QA are later packages.
+The factory supports local setup, media inventory, FilmSpec validation, and screen-only preview rendering. Package 3 verifies the pipeline with labeled synthetic material. Client rendering requires licensing and privacy clearance, and production delivery still has separate gates.
 
 ## Requirements
 
 - Install the repository's pinned pnpm dependencies and use a supported Node version. The commands were tested in PowerShell 5.1 and 7 with Node 24 and pnpm 12.
 - Put FFprobe on PATH for scans. FFmpeg is also used by the synthetic integration suite. Check with `ffprobe -version` and `ffmpeg -version`.
 - On Windows the scanner uses Windows PowerShell 5.1 and a local filesystem supporting access-time suppression and hard links. Keep the report destination outside the input project. Allow scratch disk space for the input catalog during probing.
+- Rendering uses FFmpeg, FFprobe and the local Chromium executable pinned by the Remotion setup. Set the process-level UVF_CHROMIUM_EXECUTABLE to an installed executable if the standard local location differs. The render path uses no browser downloads or external assets. Keep preview and scratch space on D: on the reference host.
 
 ## Start a project
 
@@ -68,6 +69,37 @@ The brief is UTF-8 JSON. Unknown keys and unsupported schema versions fail valid
 - Trim is optional on features and applies only to video. Times are in source seconds. End must be after start and within the probed duration. Untrimmed videos pass their full source window to the plan. Shot duration and source window remain separate for the render adapter.
 - V1 compatibility accepts an explicitly versioned flat brief with id, appName, appColor, hook, cta, screenshots, and features with title, subtitle, and screenshot. Optional assetDirectory and aspectRatios carry forward. The first screenshots entry becomes the hero, and feature paths must appear in that catalog. Migration occurs in memory. The plan records the original brief version. The client brief and engine FilmSpec use separate schema versions.
 
+## Render a preview
+
+Add a renderRights object to the v2 brief after confirming the rights and privacy status. Set origin to synthetic for generated test media or client for cleared client media, set approved to true, and record meaningful license and privacy notes. This is an operator declaration. A clean media scan alone supplies no clearance.
+
+```json
+{
+  "renderRights": {
+    "origin": "synthetic",
+    "approved": true,
+    "license": "Original generated interface and animation for the acceptance test",
+    "privacy": "Generated labels and numbers without client or personal data"
+  },
+  "heroPresentation": { "fit": "contain" }
+}
+```
+
+Merge the fields above into the existing brief. A feature can carry its own presentation. The fit accepts contain for the entire cropped source with padding, and cover for filling the screen slot with additional edge cropping. Crop is optional and takes x, y, width and height as fractions of the original source, with origin at its top left. Focal is optional and takes x and y within the selected crop. Both axes are in the range 0–1, with 0.5 at center. The renderer clamps the focal offset at the crop edges. Use contain when every UI label needs to remain visible.
+
+```powershell
+pnpm factory scan --project 'projects/first-app'
+pnpm factory validate --project 'projects/first-app'
+pnpm factory render --project 'projects/first-app' --ratios '16:9,9:16,1:1' --profile preview
+pnpm factory render --project 'projects/first-app' --ratios '1:1' --profile preview --frame 30
+```
+
+The CLI uses the same brief and validation on each invocation, checks the selected hashes and fully decodes the chosen sources before rendering. It accepts the same --brief and --out options as validate. Omit ratios to render every ratio in the brief. With --frame, the zero-based index writes a lossless diagnostic PNG. Without it, the preview writes native-resolution silent H.264 MP4s with limited-range BT.709 and verifies stream properties, constant packet spacing and full decode. The CLI publishes the batch and its render report together, in a new output directory.
+
+Recordings use a composition-rate frame grid and trim start inclusive, end exclusive. A shot longer than the trimmed source holds its last available frame. The screen layer draws numbered local images and waits for decoding through Remotion. Recording audio is omitted. The screen slot and overlay layout have separate safe areas. If a brief's copy overflows on a target ratio, shorten it and retry. A tightly configured crop can still cut text already present inside the source image.
+
+The preview supports square-pixel recordings with SDR BT.709 or sRGB-compatible tags. Untagged videos use FFmpeg's SDR decode defaults. Screenshots retain the original browser-decoded image and its embedded profile. General ICC/EXIF conformance, HDR or wide-gamut recordings, mix/master audio, device treatments and production master profiles are separate work.
+
 ## Review results and failures
 
 - Accepted media extensions are JPG, JPEG, PNG, WebP, MP4, and MOV. Scan records codec, profile, container, dimensions, available rotation and color tags, video duration and average fps, audio stream count, byte count and SHA-256. Byte-identical duplicates point to the earliest path in the sorted catalog. The scan assesses metadata and can detect probe failures. It does not certify full decoding, ICC/EXIF color interpretation, or visual suitability.
@@ -83,6 +115,7 @@ pnpm run build
 pnpm lint
 pnpm test
 pnpm test:factory
+pnpm test:factory-render
 ```
 
-Metadata fields and access-time behavior follow the installed toolchain. [FFprobe documentation](https://ffmpeg.org/ffprobe.html) · [Windows access-time suppression](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfiletime)
+Metadata fields, access-time behavior and image readiness follow the installed toolchain. [FFprobe documentation](https://ffmpeg.org/ffprobe.html) · [Windows access-time suppression](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfiletime) · [Remotion Img](https://www.remotion.dev/docs/img)
