@@ -5,8 +5,9 @@ import { applyEase } from "../engine/time/ease";
 import { EXIT_SECONDS, type CompiledFilm, type PlannedOverlay } from "../engine/compile/compile";
 import { ChartView, CounterView } from "./dataviz/DataViews";
 import { HudView } from "./hud/HudView";
-import { elementBox, safeRect, typeStyle } from "./layout";
+import { aspectOf, elementBox, safeRect, typeStyle } from "./layout";
 import { screenViewport } from "../engine/client/screen";
+import { editorialLayout, type EditorialBinding } from "../engine/client/editorial";
 import { TextView } from "./text/TextView";
 
 /**
@@ -36,19 +37,29 @@ function useFontsReady(): boolean {
   return ready;
 }
 
-const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkScreenClearance?: boolean }> = ({
-  o, compiled, checkScreenClearance,
+const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkScreenClearance?: boolean; editorial?: EditorialBinding; flow?: boolean }> = ({
+  o, compiled, checkScreenClearance, editorial, flow,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
   const el = o.element;
   const box = useRef<HTMLDivElement>(null);
+  const layout = editorial && editorialLayout(aspectOf(width, height), { width, height }, o.sceneId, editorial.safeAreas);
+  const region = layout && (el.id === "eyebrow" || el.id === "headline" || el.id === "body") ? layout[el.id] : undefined;
   useLayoutEffect(() => {
     if (!checkScreenClearance || !box.current) return;
     const film = box.current.closest("[data-factory-film]")?.getBoundingClientRect();
     if (!film) return;
     const scale = film.width / width;
     const content = box.current.getBoundingClientRect();
+    if (region) {
+      const groupHeight = flow ? (box.current.closest("[data-editorial-copy]")?.getBoundingClientRect().height ?? 0) / scale : 0;
+      const available = layout ? layout.body.top + layout.body.height - layout.eyebrow.top : 0;
+      if (content.height / scale > region.height + 1 || box.current.scrollWidth > region.width + 1 || groupHeight > available + 1) {
+        cancelRender(new Error(`Copy exceeds the ${el.id} editorial region in ${o.sceneId} (${width}x${height}). Shorten the brief text.`));
+      }
+      return;
+    }
     const safe = safeRect(width, height);
     const slot = screenViewport(width, height);
     const top = (content.top - film.top) / scale;
@@ -63,7 +74,10 @@ const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkS
       cancelRender(new Error("Copy exceeds the factory safe area for " + o.sceneId + " (" + width + "x" + height + "). Shorten the brief text."));
     }
   });
-  const { style, width: boxWidth, align } = elementBox(el, { width, height });
+  const { style, width: boxWidth, align } = region && layout ? {
+    style: flow ? { width: region.width } : { position: "absolute" as const, top: region.top, left: region.left, width: region.width },
+    width: region.width, align: layout.align,
+  } : elementBox(el, { width, height });
   const exit = el.exit === "none" ? 0 : applyEase("smooth", frame / fps - (o.outSec - o.inSec), EXIT_SECONDS, fps);
   const shift = (el.exit === "rise" ? -1 : el.exit === "sink" ? 1 : 0) * exit * Math.min(width, height) * 0.03;
   const ctx = { look: compiled.look, palette: compiled.palette, grid: compiled.stage.grid };
@@ -82,23 +96,34 @@ const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkS
   );
 };
 
-type OverlayProps = { compiled: CompiledFilm; checkScreenClearance?: boolean };
+type OverlayProps = { compiled: CompiledFilm; checkScreenClearance?: boolean; editorial?: EditorialBinding };
 
-const LoadedOverlay: React.FC<OverlayProps> = ({ compiled, checkScreenClearance }) => {
+const LoadedOverlay: React.FC<OverlayProps> = ({ compiled, checkScreenClearance, editorial }) => {
   const { fps, width, height } = useVideoConfig();
   const ready = useFontsReady();
   if (!ready) return null;
+  const show = (o: PlannedOverlay, flow = false) => {
+    const from = Math.round(o.inSec * fps);
+    const end = Math.round(o.endSec * fps);
+    return (
+      <Sequence key={o.key} from={from} durationInFrames={Math.max(1, end - from)} layout="none" name={o.key}>
+        <ElementFrame o={o} compiled={compiled} checkScreenClearance={checkScreenClearance} editorial={editorial} flow={flow} />
+      </Sequence>
+    );
+  };
   return (
     <AbsoluteFill style={{ pointerEvents: "none", ...typeStyle("body", compiled.look, { width, height }) }}>
-      {compiled.overlays.map((o) => {
-        const from = Math.round(o.inSec * fps);
-        const end = Math.round(o.endSec * fps);
+      {editorial ? compiled.stage.scenes.map((scene) => {
+        const overlays = compiled.overlays.filter((o) => o.sceneId === scene.id);
+        if (scene.id === "cta") return overlays.map((overlay) => show(overlay));
+        const { eyebrow } = editorialLayout(aspectOf(width, height), { width, height }, scene.id, editorial.safeAreas);
         return (
-          <Sequence key={o.key} from={from} durationInFrames={Math.max(1, end - from)} layout="none" name={o.key}>
-            <ElementFrame o={o} compiled={compiled} checkScreenClearance={checkScreenClearance} />
-          </Sequence>
+          <div key={scene.id} data-editorial-copy="" style={{ position: "absolute", left: eyebrow.left, top: eyebrow.top, width: eyebrow.width,
+            display: "flex", flexDirection: "column", gap: Math.min(width, height) * 0.021 }}>
+            {overlays.map((overlay) => show(overlay, true))}
+          </div>
         );
-      })}
+      }) : compiled.overlays.map((overlay) => show(overlay))}
     </AbsoluteFill>
   );
 };

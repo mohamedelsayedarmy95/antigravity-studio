@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AspectId } from "../../stage3d/schema";
 
 const coordinate = z.number().min(0).max(1);
 export const presentationSchema = z.strictObject({
@@ -17,6 +18,7 @@ export interface BoundScreen {
   width: number;
   height: number;
   presentation: ScreenPresentation;
+  aspectPresentations?: Partial<Record<AspectId, ScreenPresentation>>;
 }
 
 export function screenViewport(frameWidth: number, frameHeight: number) {
@@ -27,14 +29,19 @@ export function screenViewport(frameWidth: number, frameHeight: number) {
   };
 }
 
-export function screenGeometry(frameWidth: number, frameHeight: number, sourceWidth: number, sourceHeight: number, presentation: ScreenPresentation) {
-  const viewport = screenViewport(frameWidth, frameHeight);
+export function screenGeometry(frameWidth: number, frameHeight: number, sourceWidth: number, sourceHeight: number, presentation: ScreenPresentation,
+  editorialSlot?: ReturnType<typeof screenViewport>) {
+  const slot = editorialSlot ?? screenViewport(frameWidth, frameHeight);
   const crop = presentation.crop ?? { x: 0, y: 0, width: 1, height: 1 };
   const focal = presentation.focal ?? { x: 0.5, y: 0.5 };
   const sw = sourceWidth * crop.width;
   const sh = sourceHeight * crop.height;
   const choose = presentation.fit === "cover" ? Math.max : Math.min;
-  const scale = choose(viewport.width / sw, viewport.height / sh);
+  const scale = choose(slot.width / sw, slot.height / sh);
+  const viewport = editorialSlot && presentation.fit === "contain" ? {
+    left: slot.left + (slot.width - sw * scale) / 2, top: slot.top + (slot.height - sh * scale) / 2,
+    width: sw * scale, height: sh * scale,
+  } : slot;
   const offset = (slot: number, fitted: number, point: number) =>
     fitted <= slot ? (slot - fitted) / 2 : Math.max(slot - fitted, Math.min(0, slot / 2 - point * fitted));
   return {

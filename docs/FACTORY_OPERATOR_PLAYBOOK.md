@@ -100,6 +100,42 @@ Recordings use a composition-rate frame grid and trim start inclusive, end exclu
 
 The preview supports square-pixel recordings with SDR BT.709 or sRGB-compatible tags. Untagged videos use FFmpeg's SDR decode defaults. Screenshots retain the original browser-decoded image and its embedded profile. General ICC/EXIF conformance, HDR or wide-gamut recordings, mix/master audio, device treatments and production master profiles are separate work.
 
+## Studio Cut editorial template
+
+Select the opt-in Studio Cut profile in a v2 client brief. It uses the same `factory validate` and `factory render` commands. Set `fps` to 30, choose 12–16 seconds, and specify two to four feature beats. Each feature can have a short `label` for the on-screen category. The template selects the `studio` look, plans a hook, a proposition, two or more product beats, and a sustained end card. Preview a short headline with supporting copy in all delivery ratios. The renderer stops if copy cannot fit its assigned region.
+
+```json
+{
+  "editorial": {
+    "template": "studio-cut-v1",
+    "productLabel": "Field planning",
+    "proposition": { "title": "Give every visit a plan.", "body": "Routes, observations, and handoffs in one workspace." },
+    "closingLine": "Field planning for teams on the move.",
+    "logo": "mark.png",
+    "audio": { "file": "score.wav", "gainDb": 0, "license": "Original score, cleared for this delivery" },
+    "motion": "measured",
+    "heroFraming": { "9:16": { "fit": "contain", "crop": { "x": 0.42, "y": 0.12, "width": 0.55, "height": 0.70 } } },
+    "safeAreas": { "9:16": { "top": 0.10, "right": 0.095, "bottom": 0.18, "left": 0.075 } }
+  }
+}
+```
+
+Merge the object into a valid brief with affirmative `renderRights`. Put the transparent PNG in `assets/logo` and the audio bed in `assets/audio`. Paths in the brief are relative to those directories. The score license belongs in `editorial.audio.license`. Keep a separate record of author, source, supported uses, and hash with the project. Validate checks that both assets are present within their designated directories. The renderer snapshots and verifies the logo before capture. Full MP4 jobs also decode and check the audio.
+
+Studio Cut swaps headline and screen placement as the sequence advances. Per-ratio `features[].framing` and `editorial.heroFraming` override the base media presentation. The proposition can declare `asset`, `presentation`, and `framing`, and defaults to the hero. Insets are fractions of the output frame and default to platform-aware values. Use `expressive` for a larger camera movement and stronger still-media entrance. Brand color tints the ceramic stage and media edge. The client mark lands on a light plaque independent of the chosen brand color.
+
+```powershell
+pnpm factory validate --project 'D:\My Client Projects\fieldnote' --out 'D:\Factory Reports\fieldnote'
+pnpm factory render --project 'D:\My Client Projects\fieldnote' --ratios '16:9,9:16,1:1' --frames '0,26,85,160,252,360,419' --out 'D:\Factory Reports\fieldnote'
+pnpm factory render --project 'D:\My Client Projects\fieldnote' --ratios '16:9,9:16,1:1' --profile preview --out 'D:\Factory Reports\fieldnote'
+```
+
+Use `--frames` for up to 24 distinct zero-based indices. It produces PNGs without preparing audio. The regular full render uses one cleared music bed. Build or select it against `editorial.cues` in the validated plan. For a 14-second, two-feature brief those cues are frames 0, 60, 135, 225 and 330. Other durations and feature counts produce their own cut list. Allow enough music for the entire film. The factory applies a short head and tail fade, accepts an attenuation from 0 to −24 dB, and enforces −1 dBTP headroom and a broad −60 to −10 LUFS guard. It muxes frame-aligned 48 kHz stereo AAC without re-encoding picture. It does not analyze musical downbeats or mix recording audio, speech or effects. Read the output receipt for the measured loudness, selected logo and audio hashes and published file hashes.
+
+### Agent-neutral operation
+
+Any caller can write the same versioned JSON to a local project and run `factory scan`, `validate` and `render`. Retain creative treatment and approval records separately. The brief holds approved choices, the compiled plan describes frame timing, and objective QA comes from the render receipt and local tests. Callers should handle process exit codes and collect the emitted paths. Existing v1 migration and v2 briefs without `editorial` keep their established workflow and silent preview output. This profile has been exercised through the local CLI. Cross-agent clean-checkout tests, a machine-readable CLI result protocol, and portable support-matrix evidence remain future work.
+
 ## Review results and failures
 
 - Accepted media extensions are JPG, JPEG, PNG, WebP, MP4, and MOV. Scan records codec, profile, container, dimensions, available rotation and color tags, video duration and average fps, audio stream count, byte count and SHA-256. Byte-identical duplicates point to the earliest path in the sorted catalog. The scan assesses metadata and can detect probe failures. It does not certify full decoding, ICC/EXIF color interpretation, or visual suitability.

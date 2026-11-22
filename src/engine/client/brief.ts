@@ -22,6 +22,22 @@ const ratios = z.array(z.enum(["16:9", "9:16", "1:1"])).min(1).max(3)
   .refine((values) => new Set(values).size === values.length, "List each ratio once");
 const trim = z.strictObject({ startSeconds: z.number().nonnegative(), endSeconds: z.number().positive() })
   .refine((range) => range.endSeconds > range.startSeconds, "End must be after start");
+const eachRatio = <T extends z.ZodType>(schema: T) => z.strictObject({
+  "16:9": schema.optional(), "9:16": schema.optional(), "1:1": schema.optional(),
+});
+const inset = z.number().min(0.035).max(0.22);
+const editorial = z.strictObject({
+  template: z.literal("studio-cut-v1"),
+  productLabel: copy,
+  proposition: z.strictObject({ title: copy, body: copy, asset: assetPath.optional(),
+    presentation: presentationSchema.optional(), framing: eachRatio(presentationSchema).optional() }),
+  closingLine: copy.optional(),
+  logo: assetPath.refine((name) => /\.png$/i.test(name), "Supply a PNG brand mark"),
+  audio: z.strictObject({ file: assetPath, license: copy, gainDb: z.number().min(-24).max(0).default(0) }),
+  motion: z.enum(["measured", "expressive"]).default("measured"),
+  safeAreas: eachRatio(z.strictObject({ top: inset, right: inset, bottom: inset, left: inset })).optional(),
+  heroFraming: eachRatio(presentationSchema).optional(),
+});
 
 const v2 = z.strictObject({
   schemaVersion: z.literal("2"),
@@ -32,6 +48,7 @@ const v2 = z.strictObject({
   heroPresentation: presentationSchema.optional(),
   features: z.array(z.strictObject({
     title: copy, body: copy, asset: assetPath, trim: trim.optional(), presentation: presentationSchema.optional(),
+    framing: eachRatio(presentationSchema).optional(), label: copy.optional(),
   })).min(1).max(6),
   cta: copy,
   assets: z.strictObject({ directory: assetPath.default(defaultAssetDirectory) }).default({ directory: defaultAssetDirectory }),
@@ -43,6 +60,21 @@ const v2 = z.strictObject({
   fps: z.union([z.literal(30), z.literal(60)]).default(60),
   aspectRatios: ratios.default(["9:16", "16:9", "1:1"]),
   renderRights: z.strictObject({ origin: z.enum(["synthetic", "client"]), approved: z.literal(true), license: copy, privacy: copy }).optional(),
+  editorial: editorial.optional(),
+}).superRefine((value, ctx) => {
+  if (!value.editorial) {
+    value.features.forEach((feature, i) => {
+      if (feature.framing) ctx.addIssue({ code: "custom", path: ["features", i, "framing"], message: "Select an editorial template to use aspect framing" });
+      if (feature.label) ctx.addIssue({ code: "custom", path: ["features", i, "label"], message: "Select an editorial template to use feature labels" });
+    });
+    return;
+  }
+  if (value.features.length < 2 || value.features.length > 4) {
+    ctx.addIssue({ code: "custom", path: ["features"], message: "Studio Cut uses two to four feature beats" });
+  }
+  if (value.durationSeconds < 12 || value.durationSeconds > 16 || value.fps !== 30) {
+    ctx.addIssue({ code: "custom", path: ["editorial"], message: "Studio Cut preview uses 12–16 seconds at 30 fps" });
+  }
 });
 
 // The flat v1 interchange format names its ordered catalog "screenshots".

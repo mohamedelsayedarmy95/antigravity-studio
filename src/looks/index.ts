@@ -65,6 +65,23 @@ export const LOOKS = {
     transition: "dissolve",
     post: { toneMapping: "agx", bloom: { intensity: 0.6, threshold: 0.95 }, vignette: { darkness: 0.45, offset: 0.3 }, grain: 0.02 },
   },
+  studio: {
+    id: "studio",
+    palette: { base: "#dadde7", surface: "#f9f7f1", ink: "#172039", primary: "#244bca", accent: "#244bca", glow: "#f4f4ff" },
+    type: {
+      ...TYPE_BASE,
+      display: { family: "display", weight: 700, size: 0.079, tracking: -0.035, lineHeight: 0.99 },
+      headline: { family: "display", weight: 700, size: 0.066, tracking: -0.03, lineHeight: 1.03 },
+      body: { family: "sans", weight: 500, size: 0.029, tracking: -0.008, lineHeight: 1.28 },
+      label: { family: "mono", weight: 500, size: 0.018, tracking: 0.11, lineHeight: 1.25, uppercase: true },
+    },
+    reveal: "maskedRise",
+    spring: "appleHero",
+    lighting: "studioSoftbox",
+    // eslint-disable-next-line @remotion/non-pure-animation -- A FilmSpec cut, evaluated by the frame-based stage.
+    transition: "cut",
+    post: { toneMapping: "agx", exposure: 1.08, bloom: false, dof: false, vignette: false, grain: 0 },
+  },
 } satisfies Record<string, Look>;
 
 export type LookId = keyof typeof LOOKS;

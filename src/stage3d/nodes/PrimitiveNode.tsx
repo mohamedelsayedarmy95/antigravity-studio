@@ -29,7 +29,11 @@ function primitiveGeometry(shape: PrimitiveShape): THREE.BufferGeometry {
 }
 
 export const PrimitiveNode: React.FC<{ spec: PrimitiveNodeSpec; ctx: EvalContext; palette: Palette }> = ({ spec, ctx, palette }) => {
-  const geometry = useMemo(() => primitiveGeometry(spec.shape), [spec.shape]);
+  const geometry = useMemo(() => {
+    const shape = primitiveGeometry(spec.shape);
+    if (spec.dimensions) shape.scale(...spec.dimensions);
+    return shape;
+  }, [spec.shape, spec.dimensions]);
   const material = useMemo(() => createMaterial(materialRecipe(spec.material, palette)), [spec.material, palette]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);

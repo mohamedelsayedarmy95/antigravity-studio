@@ -84,6 +84,8 @@ export const PrimitiveNodeSchema = z.object({
   ...NodeCommon,
   type: z.literal("primitive"),
   shape: PrimitiveShapeSchema,
+  /** Optional per-axis geometry dimensions relative to the primitive's nominal size. */
+  dimensions: Vec3Schema.refine((values) => values.every((value) => value > 0 && value <= 5), "Dimensions must be in (0, 5]").optional(),
   material: MaterialSchema,
 });
 
