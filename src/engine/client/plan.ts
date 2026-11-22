@@ -60,7 +60,7 @@ export function planProject(brief: ClientBrief, assets: readonly AssetForPlan[])
     const end = index === beats.length - 1 ? totalFrames : Math.round(totalFrames * fraction);
     const length = ((end - start) + "f") as `${number}f`;
     start = end;
-    if (studio) return studioScene(beat, length, studio.motion);
+    if (studio) return studioScene(beat, length, studio.motion, studio.template, studio.closingStatement);
     return {
       id: beat.id, length, transitionIn: { type: "cut" },
       overlay: [
@@ -87,6 +87,7 @@ export function planProject(brief: ClientBrief, assets: readonly AssetForPlan[])
     ...(studio ? { editorial: {
       template: studio.template, logo: studio.logo, audio: studio.audio, motion: studio.motion,
       safeAreas: byAspect(studio.safeAreas),
+      ...(studio.direction ? { direction: studio.direction } : {}),
       cues: compiled.stage.scenes.map((scene) => ({ scene: scene.id, frame: Math.round(scene.start * compiled.fps) })),
     } } : {}),
     shots: compiled.stage.scenes.map((scene, index) => ({

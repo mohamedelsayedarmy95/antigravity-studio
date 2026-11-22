@@ -2,16 +2,19 @@ import type { ClientBrief } from "./brief";
 import type { FilmSpecInput } from "../schema/film";
 import type { Vec3 } from "../time/animatable";
 import { ASPECTS, type AspectId } from "../../stage3d/schema";
-import { editorialLayout, type EditorialSafeAreas } from "./editorial";
+import { editorialLayout, type EditorialSafeAreas, type StudioTemplate } from "./editorial";
 
 export function studioScene(
   beat: { id: string; title: string; body: string; label: string },
   length: `${number}f`,
   motion: NonNullable<ClientBrief["editorial"]>["motion"],
+  template: StudioTemplate,
+  closingStatement?: string,
 ): FilmSpecInput["timeline"][number] {
   const closing = beat.id === "cta";
   const hook = beat.id === "hook";
   const proposition = beat.id === "proposition";
+  const directed = template === "studio-cut-v2";
   const move = motion === "expressive" ? 1.5 : 1;
   const set = closing ? { inner: "#23386e", outer: "#0d1535", ceramic: "#3c508e", edge: "#2b407e" } :
     { inner: "#fff7ec", outer: "#e6eaf5", ceramic: "#8297cd", edge: "#acbada" };
@@ -31,22 +34,27 @@ export function studioScene(
     post: closing ? undefined : { toneMapping: "aces", exposure: 1.48 },
     camera: {
       lens: 45, target: [0, 0, 0], azimuth: proposition ? -7 : 4, elevation: 5, distance: 5.5,
-      moves: hook ? [{ rig: "pushIn", amount: 0.072 * move, ease: "expoOut" }] :
+      moves: directed && hook ? [{ rig: "pullBack", amount: 0.09, from: 0.2, to: 1.4, ease: "smooth" }] :
+        directed && proposition ? [{ rig: "truck", amount: 0.24, from: 0, to: 1.5, ease: "expoOut" }] :
+        hook ? [{ rig: "pushIn", amount: 0.072 * move, ease: "expoOut" }] :
         [{ rig: "orbit", degrees: (closing ? 9 : proposition ? -7 : 4) * move, ease: "smooth" }],
     },
     overlay: [
       ...(beat.label ? [{ id: "eyebrow", kind: "text" as const, role: closing ? "title" as const : "label" as const, content: beat.label, reveal: "fade" as const,
         exit: "none" as const, color: closing ? "#c5d4ff" as const : "#263a78" as const, at: 0 }] : []),
-      { id: "headline", kind: "text", role: hook || closing ? "display" : "headline", content: beat.title,
-        reveal: closing ? "perGlyph" : hook ? "fade" : "maskedRise", exit: "none", color: closing ? "#ffffff" : "palette.ink", at: hook ? -0.7 : 0.07 },
+      { id: "headline", kind: "text", role: hook || closing ? "display" : "headline", content: closing && closingStatement ? closingStatement : beat.title,
+        reveal: closing ? directed ? "maskedRise" : "perGlyph" : hook ? "fade" : "maskedRise", exit: "none",
+        color: closing ? "#ffffff" : "palette.ink", at: hook ? -0.7 : directed && closing ? 0.14 : 0.07 },
       ...(beat.body ? [{ id: "body", kind: "text" as const, role: "body" as const, content: beat.body,
         reveal: "fade" as const, exit: "none" as const, color: closing ? "#dbe4ff" as const : "#34405b" as const, at: hook ? 0.18 : 0.22 }] : []),
+      ...(closing && closingStatement ? [{ id: "action", kind: "text" as const, role: "title" as const, content: beat.title,
+        reveal: "fade" as const, exit: "none" as const, color: "#142649" as const, at: 0.44 }] : []),
     ],
   };
 }
 
 /** Place the actual 3D relief under each aspect's product plane. Camera distance and lens match studioScene. */
-export function stageStudioCut(spec: FilmSpecInput, aspect: AspectId, safeAreas: EditorialSafeAreas): FilmSpecInput {
+export function stageStudioCut(spec: FilmSpecInput, aspect: AspectId, safeAreas: EditorialSafeAreas, template?: StudioTemplate): FilmSpecInput {
   const frame = ASPECTS[aspect];
   const shortSide = Math.min(frame.width, frame.height);
   const worldShortSide = 6.35 * 24 / 45;
@@ -57,7 +65,7 @@ export function stageStudioCut(spec: FilmSpecInput, aspect: AspectId, safeAreas:
   }).join("") : base;
   return { ...spec, timeline: spec.timeline.map((scene) => {
     if (!scene.world) return scene;
-    const { media, eyebrow } = editorialLayout(aspect, frame, scene.id, safeAreas);
+    const { media, eyebrow } = editorialLayout(aspect, frame, scene.id, safeAreas, template);
     const centerX = media ? media.left + media.width / 2 : frame.width * 0.88;
     const centerY = media ? media.top + media.height / 2 : frame.height * 0.85;
     const side = centerX >= frame.width / 2 ? 1 : -1;

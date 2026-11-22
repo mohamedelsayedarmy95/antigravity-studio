@@ -21,7 +21,7 @@ export type FilmProps = { spec: FilmSpecInput; screens?: Record<string, BoundScr
 export const Film: React.FC<FilmProps> = ({ spec, screens, editorial }) => {
   const { width, height } = useVideoConfig();
   const aspect = aspectOf(width, height);
-  const compiled = useMemo(() => compileFilm(editorial ? stageStudioCut(spec, aspect, editorial.safeAreas) : spec), [spec, aspect, editorial]);
+  const compiled = useMemo(() => compileFilm(editorial ? stageStudioCut(spec, aspect, editorial.safeAreas, editorial.template) : spec), [spec, aspect, editorial]);
   return (
     <AbsoluteFill data-factory-film={screens ? "" : undefined} style={{ backgroundColor: "#000000" }}>
       <ThreeCanvas width={width} height={height} flat gl={{ antialias: false, alpha: false, powerPreference: "high-performance", stencil: false }}>

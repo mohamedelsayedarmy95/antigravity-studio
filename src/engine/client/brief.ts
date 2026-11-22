@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { LookIdSchema } from "../../looks";
 import { presentationSchema } from "./screen";
+import { shotDirectionSchema } from "./focus";
 
 export const defaultAssetDirectory = "assets/screenshots";
 const windowsDevice = /^(?:con|prn|aux|nul|com[1-9¹²³]|lpt[1-9¹²³]|conin\$|conout\$)(?:\.|$)/i;
@@ -27,16 +28,20 @@ const eachRatio = <T extends z.ZodType>(schema: T) => z.strictObject({
 });
 const inset = z.number().min(0.035).max(0.22);
 const editorial = z.strictObject({
-  template: z.literal("studio-cut-v1"),
+  template: z.enum(["studio-cut-v1", "studio-cut-v2"]),
   productLabel: copy,
   proposition: z.strictObject({ title: copy, body: copy, asset: assetPath.optional(),
     presentation: presentationSchema.optional(), framing: eachRatio(presentationSchema).optional() }),
   closingLine: copy.optional(),
+  closingStatement: copy.optional(),
   logo: assetPath.refine((name) => /\.png$/i.test(name), "Supply a PNG brand mark"),
   audio: z.strictObject({ file: assetPath, license: copy, gainDb: z.number().min(-24).max(0).default(0) }),
   motion: z.enum(["measured", "expressive"]).default("measured"),
   safeAreas: eachRatio(z.strictObject({ top: inset, right: inset, bottom: inset, left: inset })).optional(),
   heroFraming: eachRatio(presentationSchema).optional(),
+  direction: z.strictObject({ hook: shotDirectionSchema.optional(), proposition: shotDirectionSchema.optional(),
+    "feature-1": shotDirectionSchema.optional(), "feature-2": shotDirectionSchema.optional(),
+    "feature-3": shotDirectionSchema.optional(), "feature-4": shotDirectionSchema.optional() }).optional(),
 });
 
 const v2 = z.strictObject({
@@ -74,6 +79,14 @@ const v2 = z.strictObject({
   }
   if (value.durationSeconds < 12 || value.durationSeconds > 16 || value.fps !== 30) {
     ctx.addIssue({ code: "custom", path: ["editorial"], message: "Studio Cut preview uses 12–16 seconds at 30 fps" });
+  }
+  if (value.editorial.template === "studio-cut-v1" && (value.editorial.direction || value.editorial.closingStatement)) {
+    ctx.addIssue({ code: "custom", path: ["editorial", "template"], message: "Directed shots and a separate closing statement require studio-cut-v2" });
+  }
+  for (const key of Object.keys(value.editorial.direction ?? {})) {
+    if (key.startsWith("feature-") && Number(key.slice(8)) > value.features.length) {
+      ctx.addIssue({ code: "custom", path: ["editorial", "direction", key], message: "No corresponding feature in this brief" });
+    }
   }
 });
 

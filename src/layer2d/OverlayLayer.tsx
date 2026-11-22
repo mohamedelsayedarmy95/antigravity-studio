@@ -44,8 +44,8 @@ const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkS
   const { fps, width, height } = useVideoConfig();
   const el = o.element;
   const box = useRef<HTMLDivElement>(null);
-  const layout = editorial && editorialLayout(aspectOf(width, height), { width, height }, o.sceneId, editorial.safeAreas);
-  const region = layout && (el.id === "eyebrow" || el.id === "headline" || el.id === "body") ? layout[el.id] : undefined;
+  const layout = editorial && editorialLayout(aspectOf(width, height), { width, height }, o.sceneId, editorial.safeAreas, editorial.template);
+  const region = layout && (el.id === "eyebrow" || el.id === "headline" || el.id === "body" || el.id === "action") ? layout[el.id] : undefined;
   useLayoutEffect(() => {
     if (!checkScreenClearance || !box.current) return;
     const film = box.current.closest("[data-factory-film]")?.getBoundingClientRect();
@@ -89,9 +89,12 @@ const ElementFrame: React.FC<{ o: PlannedOverlay; compiled: CompiledFilm; checkS
   if (el.kind === "hud") content = <HudView el={el} look={compiled.look} palette={compiled.palette} boxWidth={boxWidth} />;
 
   const justify = align === "start" ? "flex-start" : align === "end" ? "flex-end" : "center";
+  const action = el.id === "action" && editorial?.template === "studio-cut-v2";
+  const pill = action ? { padding: "11px 29px", border: "1.5px solid #eef3fa", borderRadius: 100,
+    backgroundColor: "#deebfa" } : undefined;
   return (
     <div style={{ ...style, display: "flex", justifyContent: justify, opacity: 1 - exit }}>
-      <div ref={box} style={{ transform: `translateY(${shift}px)` }}>{content}</div>
+      <div ref={box} style={{ transform: `translateY(${shift}px)`, ...pill }}>{content}</div>
     </div>
   );
 };
@@ -116,7 +119,7 @@ const LoadedOverlay: React.FC<OverlayProps> = ({ compiled, checkScreenClearance,
       {editorial ? compiled.stage.scenes.map((scene) => {
         const overlays = compiled.overlays.filter((o) => o.sceneId === scene.id);
         if (scene.id === "cta") return overlays.map((overlay) => show(overlay));
-        const { eyebrow } = editorialLayout(aspectOf(width, height), { width, height }, scene.id, editorial.safeAreas);
+        const { eyebrow } = editorialLayout(aspectOf(width, height), { width, height }, scene.id, editorial.safeAreas, editorial.template);
         return (
           <div key={scene.id} data-editorial-copy="" style={{ position: "absolute", left: eyebrow.left, top: eyebrow.top, width: eyebrow.width,
             display: "flex", flexDirection: "column", gap: Math.min(width, height) * 0.021 }}>

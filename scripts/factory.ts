@@ -6,17 +6,26 @@ import { defaultAssetDirectory, isPortablePath, parseBrief, starterBrief } from 
 import { planProject } from "../src/engine/client/plan";
 import type { AspectId } from "../src/stage3d/schema";
 import { editorialSource, isWithin, scanProject } from "./lib/client-media";
+import type { FactoryFrameRange, FactoryRenderProfile } from "./lib/client-render";
 
 const root = path.resolve(import.meta.dirname, "..");
 const usage = [
   "pnpm factory init --name <new-project> --template mobile-app [--parent <folder>]",
   "pnpm factory scan --project <folder> [--assets-dir <relative-folder> | --brief <file>] [--out <folder>]",
   "pnpm factory validate --project <folder> [--brief <file>] [--out <folder>]",
-  "pnpm factory render --project <folder> [--brief <file>] [--ratios 16:9,9:16,1:1] [--profile preview] [--frame <number> | --frames <list>] [--out <folder>]",
+  "pnpm factory render --project <folder> [--brief <file>] [--ratios 16:9,9:16,1:1] [--profile preview|master] [--frame <number> | --frames <list> | --range <start>:<end>] [--out <folder>]",
 ].join("\n");
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 const isMissing = (error: unknown) => (error as NodeJS.ErrnoException)?.code === "ENOENT";
+
+function parseFrameRange(value: string): FactoryFrameRange {
+  if (!/^(?:0|[1-9]\d*):(?:0|[1-9]\d*)$/.test(value)) throw new Error("Enter --range as start:end with nonnegative frame indices");
+  const [start, end] = value.split(":").map(Number);
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || end < start) throw new Error("Range start and end must be safe frame indices in ascending order");
+  if (end - start >= 180) throw new Error("A preview range may contain at most 180 frames");
+  return [start, end];
+}
 
 async function createProject(name: string, parent?: string) {
   const brief = starterBrief(name);
@@ -128,21 +137,30 @@ async function main() {
   const { values } = parseArgs({
     args, options: {
       project: { type: "string" }, brief: { type: "string" }, "assets-dir": { type: "string" }, out: { type: "string" },
-      ratios: { type: "string" }, profile: { type: "string" }, frame: { type: "string" }, frames: { type: "string" },
+      ratios: { type: "string" }, profile: { type: "string" }, frame: { type: "string" }, frames: { type: "string" }, range: { type: "string" },
     },
   });
   if (!values.project || (values["assets-dir"] !== undefined && (command !== "scan" || values.brief !== undefined)) ||
-      (command !== "render" && (values.ratios !== undefined || values.profile !== undefined || values.frame !== undefined || values.frames !== undefined))) throw new Error(usage);
+      (command !== "render" && (values.ratios !== undefined || values.profile !== undefined || values.frame !== undefined || values.frames !== undefined || values.range !== undefined))) throw new Error(usage);
   const project = await realpath(values.project);
   if (!(await lstat(project)).isDirectory()) throw new Error("--project must be a directory");
   const brief = values["assets-dir"] === undefined
     ? await loadBrief(path.resolve(values.brief ?? path.join(project, "brief.json")), command === "scan" && values.brief === undefined)
     : null;
   let frames: number[] | undefined;
+  let frameRange: FactoryFrameRange | undefined;
+  let profile: FactoryRenderProfile = "preview";
   if (command === "render") {
     if (!brief?.brief.renderRights) throw new Error("Render requires a renderRights declaration in the brief covering licensing and privacy");
-    if (values.profile !== undefined && values.profile !== "preview") throw new Error("Package 3 supports --profile preview");
+    if (values.profile !== undefined && values.profile !== "preview" && values.profile !== "master") throw new Error("Render profile must be preview or master");
+    profile = values.profile ?? "preview";
     if (values.frame !== undefined && values.frames !== undefined) throw new Error("Choose --frame or --frames");
+    if (values.range !== undefined && (values.frame !== undefined || values.frames !== undefined)) throw new Error("Choose --frame, --frames, or --range");
+    if (profile === "master") {
+      if (values.range !== undefined || values.frame !== undefined || values.frames !== undefined) throw new Error("The master profile renders the full timeline only");
+      if (brief.brief.fps !== 30) throw new Error("The master profile requires a 30 fps brief");
+    }
+    if (values.range !== undefined) frameRange = parseFrameRange(values.range);
     const requested = values.frames?.split(",") ?? (values.frame === undefined ? undefined : [values.frame]);
     if (requested) {
       if (requested.length > 24 || requested.some((frame) => !/^(?:0|[1-9]\d*)$/.test(frame)) || new Set(requested).size !== requested.length) {
@@ -186,8 +204,9 @@ async function main() {
     });
   if (new Set(aspects).size !== aspects.length) throw new Error("List each render ratio once");
   if (frames?.some((frame) => frame >= plan.totalFrames)) throw new Error("A requested frame is outside the validated timeline");
+  if (frameRange && frameRange[1] >= plan.totalFrames) throw new Error("The requested range is outside the validated timeline");
   const { renderClient } = await import("./lib/client-render");
-  await renderClient({ project, output, brief: brief.brief, plan, manifest, aspects, frames });
+  await renderClient({ project, output, brief: brief.brief, plan, manifest, aspects, frames, frameRange, profile });
 }
 
 main().catch((error: Error) => {

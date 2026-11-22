@@ -15,6 +15,19 @@ import { muxEditorialAudio, prepareEditorialAudio, verifyEditorialAudio } from "
 
 type Plan = ReturnType<typeof planProject>;
 type Manifest = Awaited<ReturnType<typeof scanProject>>;
+export type FactoryRenderProfile = "preview" | "master";
+export type FactoryFrameRange = [start: number, endInclusive: number];
+
+export function factoryEncoding(profile: FactoryRenderProfile, fps: number) {
+  const master = profile === "master";
+  if (master && fps !== 30) throw new Error("The master profile requires a 30 fps brief");
+  return {
+    codec: "h264" as const, colorSpace: "bt709" as const, pixelFormat: "yuv420p" as const, fps,
+    crf: master ? 10 : 18,
+    x264Preset: master ? "slow" as const : "fast" as const,
+    h264Profile: master ? "high" as const : null,
+  };
+}
 
 function mediaCommand(executable: string, args: string[], action: string) {
   const result = spawnSync(executable, args, {
@@ -111,38 +124,47 @@ async function prepareScreens(project: string, plan: Plan, manifest: Manifest, s
   return screens;
 }
 
-export function verifyFactoryMp4(file: string, aspect: AspectId, fps: number, expectedFrames: number, audio = false) {
+export function verifyFactoryMp4(file: string, aspect: AspectId, fps: number, expectedFrames: number, audio = false, h264Profile?: string) {
   const probe = mediaCommand("ffprobe", [
     "-v", "error", "-show_streams", "-show_packets", "-show_entries",
-    "packet=pts,stream_index:stream=index,codec_type,codec_name,width,height,pix_fmt,color_space,color_range,color_primaries,color_transfer,time_base,avg_frame_rate,nb_frames",
+    "packet=pts,stream_index:stream=index,codec_type,codec_name,profile,width,height,pix_fmt,color_space,color_range,color_primaries,color_transfer,time_base,avg_frame_rate,nb_frames,duration_ts,bit_rate",
     "-of", "json", file,
   ], "Cannot inspect generated MP4");
   const { streams, packets } = JSON.parse(probe) as {
     streams: Record<string, string | number>[]; packets: { pts: number; stream_index: number }[];
   };
-  const { index, ...stream } = streams[0] ?? {};
+  const { index, bit_rate, ...stream } = streams[0] ?? {};
   const expected = ASPECTS[aspect];
+  const videoBitrateBps = Number(bit_rate);
   if (streams.length !== (audio ? 2 : 1) || (audio && streams[1].codec_type !== "audio") ||
       stream.codec_type !== "video" || stream.codec_name !== "h264" ||
+      (h264Profile && String(stream.profile).toLowerCase() !== h264Profile) ||
       stream.width !== expected.width || stream.height !== expected.height || stream.pix_fmt !== "yuv420p" ||
       stream.color_space !== "bt709" || stream.color_primaries !== "bt709" || stream.color_transfer !== "bt709" ||
-      stream.color_range !== "tv" || stream.avg_frame_rate !== fps + "/1" || Number(stream.nb_frames) !== expectedFrames) {
+      stream.color_range !== "tv" || stream.avg_frame_rate !== fps + "/1" || Number(stream.nb_frames) !== expectedFrames ||
+      !Number.isFinite(videoBitrateBps) || videoBitrateBps <= 0) {
     throw new Error("Generated MP4 failed stream conformance for " + aspect);
   }
   const [n, d] = String(stream.time_base).split("/").map(Number);
   const pts = packets.filter((packet) => packet.stream_index === index).map((packet) => packet.pts).sort((a, b) => a - b);
-  if (pts.length !== expectedFrames || pts.some((value, i) => value * n * fps !== i * d)) {
-    throw new Error("Generated MP4 is not constant frame rate from frame zero: " + aspect);
+  if (pts.length !== expectedFrames || Number(stream.duration_ts) * n * fps !== expectedFrames * d ||
+      pts.some((value, i) => value * n * fps !== i * d)) {
+    throw new Error("Generated MP4 has a duration mismatch or is not constant frame rate from frame zero: " + aspect);
   }
   ffmpeg(["-threads", "1", "-err_detect", "explode", "-i", file, "-map", "0:v:0", "-f", "null", "-"], "Generated MP4 failed full decode");
-  return { ...stream, decoded: true, constantFrameRate: true,
+  return { ...stream, videoBitrateBps, decoded: true, constantFrameRate: true,
     ...(audio ? { audio: verifyEditorialAudio(file, expectedFrames / fps) } : {}) };
 }
 
 export async function renderClient(input: {
-  project: string; output: string; brief: ClientBrief; plan: Plan; manifest: Manifest; aspects: AspectId[]; frames?: number[];
+  project: string; output: string; brief: ClientBrief; plan: Plan; manifest: Manifest; aspects: AspectId[];
+  frames?: number[]; frameRange?: FactoryFrameRange; profile?: FactoryRenderProfile;
 }) {
-  const { project, output, brief, plan, manifest, aspects, frames } = input;
+  const { project, output, brief, plan, manifest, aspects, frames, frameRange, profile = "preview" } = input;
+  const fps = plan.filmSpec.output.fps;
+  const encoder = factoryEncoding(profile, fps);
+  const { h264Profile } = encoder;
+  const videoFrames = frameRange ? frameRange[1] - frameRange[0] + 1 : plan.totalFrames;
   const browser = process.env.UVF_CHROMIUM_EXECUTABLE ??
     path.join(ROOT, "node_modules/.remotion/chrome-headless-shell/win64/chrome-headless-shell-win64/chrome-headless-shell.exe");
   await access(browser).catch(() => { throw new Error("A local Chromium executable is required. Set UVF_CHROMIUM_EXECUTABLE or install the pinned Remotion browser before rendering."); });
@@ -165,7 +187,6 @@ export async function renderClient(input: {
     const publicRoot = path.join(bundleDir, "public");
     const screens = await prepareScreens(project, plan, manifest, scratch, publicRoot);
     const files = [];
-    const fps = plan.filmSpec.output.fps;
     const editorial = plan.editorial;
     const logoFile = "factory-brand.png";
     let logoSha256: string | undefined;
@@ -180,29 +201,34 @@ export async function renderClient(input: {
         "-frames:v", "1", "-f", "null", "-"], "Cannot decode editorial logo");
       logoSha256 = await mediaSha256(target);
     }
-    const bed = editorial && !frames ? await prepareEditorialAudio({
+    const bed = editorial && !frames && !frameRange ? await prepareEditorialAudio({
       project, scratch, file: editorial.audio.file, gainDb: editorial.audio.gainDb, totalFrames: plan.totalFrames, fps,
     }) : undefined;
     for (const aspect of aspects) {
       const inputProps: FilmProps = { spec: plan.filmSpec, aspect, screens,
-        ...(editorial ? { editorial: { logoFile, motion: editorial.motion, safeAreas: editorial.safeAreas } } : {}) };
+        ...(editorial ? { editorial: { logoFile, motion: editorial.motion, safeAreas: editorial.safeAreas,
+          template: editorial.template, direction: editorial.direction } } : {}) };
       const browserOptions = { serveUrl: bundleDir, inputProps, chromiumOptions, browserExecutable: browser };
       const composition = await selectComposition({ id: "FactoryFilm", ...browserOptions });
       const start = Date.now();
       for (const frame of frames ?? [undefined]) {
-        const filename = plan.filmSpec.id + "-" + aspect + (frame === undefined ? ".mp4" : "-f" + frame + ".png");
+        const suffix = frame === undefined ? (frameRange ? "-f" + frameRange.join("-") : "") + ".mp4" : "-f" + frame + ".png";
+        const filename = plan.filmSpec.id + "-" + aspect + suffix;
         const file = path.join(scratch, filename);
         if (frame === undefined) {
           const picture = bed ? path.join(scratch, "picture-" + aspect + ".mp4") : file;
           await renderMedia({
-            ...browserOptions, composition, outputLocation: picture, codec: "h264", colorSpace: "bt709",
-            pixelFormat: "yuv420p", imageFormat: "png", crf: 18, x264Preset: "fast", concurrency: 1, muted: true,
+            ...browserOptions, composition, outputLocation: picture, codec: encoder.codec, colorSpace: encoder.colorSpace,
+            pixelFormat: encoder.pixelFormat, imageFormat: "png", crf: encoder.crf, x264Preset: encoder.x264Preset,
+            concurrency: 1, muted: true, frameRange,
+            ...(h264Profile ? { ffmpegOverride: ({ args }) => args.includes("libx264")
+              ? [...args.slice(0, -1), "-profile:v", h264Profile, args[args.length - 1]] : args } : {}),
           });
           if (bed) await muxEditorialAudio({ video: picture, audio: bed.file, output: file });
         } else {
           await renderStill({ ...browserOptions, composition, output: file, frame, imageFormat: "png" });
         }
-        const qa = frame === undefined ? verifyFactoryMp4(file, aspect, fps, plan.totalFrames, bed !== undefined) : null;
+        const qa = frame === undefined ? verifyFactoryMp4(file, aspect, fps, videoFrames, bed !== undefined, h264Profile ?? undefined) : null;
         files.push({ aspect, filename, sha256: await mediaSha256(file), elapsedSeconds: (Date.now() - start) / 1000, qa });
       }
       console.log("Rendered " + aspect + " in " + ((Date.now() - start) / 1000).toFixed(2) + "s");
@@ -211,8 +237,10 @@ export async function renderClient(input: {
     await mkdir(delivery);
     for (const file of files) await rename(path.join(scratch, file.filename), path.join(delivery, file.filename));
     const receipt = {
-      schemaVersion: "1", profile: "preview", frame: frames?.length === 1 ? frames[0] : null, rightsDeclaration: brief.renderRights,
+      schemaVersion: "1", profile, frame: frames?.length === 1 ? frames[0] : null, rightsDeclaration: brief.renderRights,
       ...(frames && frames.length > 1 ? { frames } : {}),
+      ...(!frames ? { encoder } : {}),
+      ...(frameRange ? { sourceFrameRange: { start: frameRange[0], endInclusive: frameRange[1], frameCount: videoFrames } } : {}),
       ...(editorial ? { editorial: { ...editorial, logoSha256, ...(bed ? { audioSha256: bed.sourceSha256 } : {}) } } : {}),
       files, shots: plan.shots, screens: Object.fromEntries(Object.entries(screens).map(([id, screen]) => {
         const { width, height, frameCount } = screen;
@@ -220,7 +248,7 @@ export async function renderClient(input: {
       })),
     };
     await writeFile(path.join(delivery, "render-report.json"), JSON.stringify(receipt, null, 2) + "\n", { flag: "wx" });
-    const destination = path.join(output, (frames ? "still-" : "preview-") + randomUUID());
+    const destination = path.join(output, (frames ? "still" : profile) + "-" + randomUUID());
     await rename(delivery, destination);
     for (const file of files) console.log("Output: " + path.join(destination, file.filename));
     console.log("Render report: " + path.join(destination, "render-report.json"));

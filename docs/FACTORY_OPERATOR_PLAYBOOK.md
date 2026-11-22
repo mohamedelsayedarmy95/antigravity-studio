@@ -136,6 +136,21 @@ Use `--frames` for up to 24 distinct zero-based indices. It produces PNGs withou
 
 Any caller can write the same versioned JSON to a local project and run `factory scan`, `validate` and `render`. Retain creative treatment and approval records separately. The brief holds approved choices, the compiled plan describes frame timing, and objective QA comes from the render receipt and local tests. Callers should handle process exit codes and collect the emitted paths. Existing v1 migration and v2 briefs without `editorial` keep their established workflow and silent preview output. This profile has been exercised through the local CLI. Cross-agent clean-checkout tests, a machine-readable CLI result protocol, and portable support-matrix evidence remain future work.
 
+### Directed Studio Cut and export profiles
+
+Use `editorial.template: "studio-cut-v2"` for directed source framing. A distinct `editorial.proposition.asset` can show another source view. Supply `editorial.closingStatement` to display a brand statement followed by the existing brief `cta` as a separate action. Use the actual call to action supplied by the client. The original Studio Cut v1 layout and motion are preserved.
+
+Put optional shot directions under `editorial.direction.hook`, `.proposition`, or the corresponding `feature-1` through `feature-4` key. A `focus` track sets the default. A `byRatio` track replaces it for that output ratio. Focus positions use full-source normalized `x` and `y`, `zoom` uses multiples of the base crop fit, and `at` is a fraction of shot length from the first to the last frame. Start at `0` and list strictly increasing times. Hold a focus by repeating the same position and zoom at a later time. Focus preserves source proportions and holds the last authored key.
+
+An optional `emphasis` list outlines source regions while they are fully visible. Each entry contains normalized shot fractions `from` and `until` and a source-normalized `region` with `x`, `y`, `width` and `height`. Use measured regions around genuine UI states. Check source action frames at a phone-sized output view. The focus move changes framing while the recording keeps the compiled source-frame timing.
+
+```powershell
+pnpm factory render --project 'D:\My Client Projects\fieldnote' --ratios '9:16' --profile preview --range '231:264'
+pnpm factory render --project 'D:\My Client Projects\fieldnote' --ratios '16:9,9:16,1:1' --profile master
+```
+
+Preview retains H.264 CRF 18 with x264 `fast`. The inclusive zero-based `--range` accepts at most 180 frames and produces a picture-only preview. Full `master` jobs require an explicitly 30 fps brief and use native aspect dimensions, H.264 High, CRF 10, x264 `slow`, and limited-range BT.709 YUV 4:2:0. Full editorial jobs include the verified local music bed. The receipt captures encoder settings, video-stream bitrate and verified frame timing. The 30 fps SDR master profile does not qualify 60 fps, HDR, broadcaster, or other platform-specific variants.
+
 ## Review results and failures
 
 - Accepted media extensions are JPG, JPEG, PNG, WebP, MP4, and MOV. Scan records codec, profile, container, dimensions, available rotation and color tags, video duration and average fps, audio stream count, byte count and SHA-256. Byte-identical duplicates point to the earliest path in the sorted catalog. The scan assesses metadata and can detect probe failures. It does not certify full decoding, ICC/EXIF color interpretation, or visual suitability.
