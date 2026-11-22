@@ -96,6 +96,18 @@ export async function mediaDirectory(project: string, directory: string): Promis
   return current;
 }
 
+export async function editorialSource(project: string, directory: "logo" | "audio", name: string) {
+  if (!isPortablePath(name)) throw new Error(`Editorial ${directory} requires a portable path: ${name}`);
+  const root = await mediaDirectory(project, "assets/" + directory);
+  const parent = path.posix.dirname(name);
+  const base = parent === "." ? root : await mediaDirectory(root, parent);
+  const file = path.join(base, path.posix.basename(name));
+  if (!(await lstat(file)).isFile() || !isWithin(root, await realpath(file))) {
+    throw new Error(`Editorial ${directory} must be a regular file inside assets/${directory}: ${name}`);
+  }
+  return file;
+}
+
 export async function mediaSha256(file: string) {
   const hash = createHash("sha256");
   for await (const chunk of createReadStream(file)) hash.update(chunk);
