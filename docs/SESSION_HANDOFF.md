@@ -1,6 +1,14 @@
 # Universal Video Factory session handoff
 
-2026-11-21, Africa/Cairo. The checkout is D:/AntiGravity/Studio/studio-engine on engine/v1. Package 2 implementation commit is 088f8bf7fda007204f2704b07d48fc64049427e4. This handoff is in a separate documentation commit. The tracked checkout is clean after the package. SaveFix originals remain in PROJECTS/SAVEFIX/assets/screenshots and outside Git. No merge, push or history rewrite occurred.
+2026-11-22, Africa/Cairo. The checkout is D:/AntiGravity/Studio/studio-engine on engine/v1. Package 3 implementation commit is d4703c2db478e4162088ad70c5691d85c16649bd. This handoff is in a separate documentation commit. SaveFix originals remain in PROJECTS/SAVEFIX/assets/screenshots and outside Git. No merge, push or history rewrite occurred.
+
+## Package 3 technical gate
+
+- PASS for the synthetic client-to-MP4 preview workflow. A v2 brief, generated PNG and generated recording went through factory init, scan, validate, FilmSpec compilation, local screen binding, Remotion and full MP4 decode. The existing Film, stage and overlay path serves the new FactoryFilm composition. The operator playbook documents the rights declaration, source trim, crop, focal point, contain, cover and diagnostic still workflow.
+- The three silent H.264/BT.709 files are 1920×1080, 1080×1920 and 1080×1080. Each is six seconds and exactly 180 frames at constant 30 fps. Independent output checks verified every media-shot frame in each ratio, including the expected recording frames 12–41 and the hold on frame 41. Contact sheets and pixel checks cover screen placement, source crop, title and caption separation, and the deliberate text-only CTA. A second brief rendered a different framing and copy through the same composition.
+- Typecheck, build, lint with five baseline warnings, 22 unit tests, two ingestion integration tests, and the render integration test passed. The render test covers missing and corrupt sources, incompatible pixel aspect, a Windows-locked recording, absent rights and overlay overflow. Two independent frame-41 jobs produced byte-identical recording PNGs in all three ratios. The six targeted M1/M2 PNGs across the three ratios matched the Package 1 reference bytes under a local-only browser policy. All five protected files match the Stage A hashes. The Stage A scratch directory was retained.
+- The gate report, exact PowerShell commands and exit codes, render outputs, contact sheets, FFmpeg checks, receipts, and Git integrity record are under D:/AntiGravity/Studio/uvf-closeout-02-stage-b3. Start with PACKAGE_3_GATE_REPORT.md. The SaveFix regression used the existing Package 2 manifest and its recorded SHA-256. No SaveFix originals were opened or rendered in Package 3. SaveFix licensing and privacy are still unverified.
+- Stage B and production readiness remain open. Package 3 proves an SDR preview with a screen layer. General ICC/EXIF and wide-gamut conformance, production masters, audio, shaped RTL and an actual cleared client-to-video run remain outside this gate. The historical a4206aa KineticText change remains an unresolved governance finding.
 
 ## Package 2 accepted technical evidence
 
@@ -15,17 +23,18 @@
 - Stage A audit and retained scratch evidence are under D:/AntiGravity/Studio/uvf-closeout-02-evidence. Baseline SHA was 59a08585c6bddf9fcfde454f68d8af2b33a5f8a6.
 - Package 1 implementation was 3657aef102502941f9f072b77bac40f4734fd602. Evidence is under D:/AntiGravity/Studio/uvf-closeout-02-stage-b1/final. The director accepted the package's technical gate. M2 creative approval is still pending. The three silent 16-second fixture exports and all protected-file rules carry forward.
 
-## Proposed Package 3
+## Proposed Package 4
 
-**Goal.** Render a finished synthetic client project from its validated brief, chosen stills and recording through the existing FilmSpec renderer. Keep the media mapping in a shared adapter and keep all client-specific choices in data.
+**Goal.** Build and review one reusable editorial template with strong hooks, restrained layouts and aspect-specific staging. Drive it from a versioned brief and the existing shot bindings. Add a locally sourced licensed audio bed and deterministic cues. Review a synthetic or cleared brief in all three ratios before proceeding to production master orchestration.
 
 | Traceability entry | Proposed proof |
 | --- | --- |
-| B2 and B4 | Consume the accepted plan and manifest. Recheck selected hashes before use. Resolving media is independent of client folder naming. |
-| B5 and B6 | Add deterministic screen-only still and video presentation first. Specify fit and crop, video time mapping, trim and short-source behavior. Prove caption and CTA layout in all three aspect ratios. True 3D device work stays available as a later additive treatment. |
-| B9 and B10 | Use the native Remotion pipeline and local scratch on D:. Establish a predictable preview export with documented SDR and full-decode behavior before expanding to master orchestration. |
-| B12 | Produce three preview MP4s from a single synthetic brief, a shot manifest and media QA, then verify repeat-frame parity and a changed brief without engine edits. |
+| B2, B4 and B5 | Let the brief select a strong subset and supply viable media framing for each ratio. Keep the existing render adapter and local rights requirements. |
+| B6 and B7 | Add reusable hook, feature and logo-reveal beats with readable type and aspect-specific staging. Compare them against the original M2 reference. |
+| B8 and B9 | Prove local, rights-cleared audio cues and mix checks alongside the verified SDR preview profile. |
+| B12 | Review three short exports with a creative rubric, targeted repeat-frame comparisons and an audio report. Log the director's decision before the master package. |
+| B10 and B13 | Carry forward production orchestration, localized shaping and caption delivery to dedicated gates. |
 
-**Prerequisites.** Director authorization for Package 3 and a rights-cleared shoot or synthetic fixtures. SaveFix can participate in rendering only after explicit licensing and privacy clearance. Apply Package 1's font-ready unmount follow-up if live spec switching enters scope. Full-frame media decoding, ICC and EXIF handling, perceptual and editorial ranking, licensed audio, RTL shaping, a branded device and human sign-off remain later gates.
+**Prerequisites.** Director authorization for Package 4, rights-cleared visuals and sound, and agreed creative review criteria. SaveFix can participate only after explicit licensing and privacy clearance. The seven M2 findings remain open: weak initial hook, excessive visual density, limited typography choreography, underexposed logo reveal, insufficient aspect-specific composition, limited editorial variation and production audio pending. M2 creative approval remains pending.
 
-**Resume.** Inspect git status and compare protected hashes to the Stage A repository-integrity.txt before changing source. Run pnpm typecheck, pnpm test and pnpm test:factory. The current production verdict stays NO-GO until the full client-to-video gates pass.
+**Resume.** Inspect Git status and compare the five protected hashes with Stage A repository-integrity.txt before editing. Run pnpm typecheck, pnpm test, pnpm test:factory and pnpm test:factory-render. The production verdict remains NO-GO pending a cleared end-to-end client render and the remaining quality and delivery gates.
