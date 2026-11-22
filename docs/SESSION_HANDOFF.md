@@ -2,6 +2,15 @@
 
 2026-11-22, Africa/Cairo. The checkout is D:/AntiGravity/Studio/studio-engine on engine/v1. Package 4 adds local audio at a1bc1f17ca2e9b7d11a481d40f300b23db5cd5a0 and the Studio Cut template at fed1744159c804f149f9fb12933191fe438fc329. SaveFix originals remain in PROJECTS/SAVEFIX/assets/screenshots and outside Git. No merge, push or history rewrite occurred.
 
+## Package 4 corrective pass · UVF-P4-CREATIVE-REMEDIATION-01
+
+- Technical PASS for the corrected three-ratio 30 fps SDR master profile. Director creative approval remains pending. The corrective code is 0af4b5fdcba3b126c91597ad5f322aa2cee644f8. Package 5 is on hold under the director's instruction.
+- Studio Cut v2 uses an immediate contour-map hook and a distinct proposition montage showing an authentic Unassigned state. It follows the supplied route, frames the recording's Priority and assignee controls at phone size, shows the save confirmation on frame 304, and holds the actual brief action beside the brand resolution. Motion and emphasis remain versioned configuration in the existing FilmSpec and render pipeline. Studio Cut v1 keeps its verified rendering. [Operator playbook](FACTORY_OPERATOR_PLAYBOOK.md)
+- Each revised master is 14 seconds and 420 frames at constant 30 fps. Native dimensions are 1920×1080, 1080×1920 and 1080×1080. Verified H.264 High, limited-range BT.709, CRF 10 with x264 slow, and measured video bitrates of 18.87, 16.64 and 10.94 Mbps. The fast preview remains CRF 18. The 30 fps profile leaves other master formats unqualified.
+- The original revised score measured −17.2 LUFS and −4.6 dBTP in the exports. The two restrained UI accents occur on frame 254 for Priority and frame 304 for the saved assignment. Musical turns land at 2.0, 4.5, 7.5 and 11.0 seconds, with the closing tonic at 13.0. Perceptual audio playback remains for director review.
+- Typecheck, build, lint with five inherited warnings, 32 unit tests, three existing integration tests and five focused profile checks passed. Nine repeated corrective stills, nine Studio Cut v1 stills, six M1/M2 PNGs and 180 Package 3 square frames matched their respective references. The three original Package 4 MP4 hashes and all five protected-file hashes match. Stage A scratch remains in place. The historical a4206aa KineticText approval issue remains open.
+- Evidence is under D:/AntiGravity/Studio/uvf-closeout-02-stage-b4-corrective. Start with PACKAGE_4_CORRECTIVE_REPORT.md, REVISED_STORYBOARD.md, AUDIO_VALIDATION.md and INDEPENDENT_REVIEW.md. Only synthetic material was used. The map callout retains its original Mira Chen metadata, while the schedule starts Unassigned. Some secondary columns leave the tight mobile crop. These and subjective motion and audio approval remain for review. SaveFix privacy and licensing are unverified.
+
 ## Package 4 technical PASS and creative PENDING
 
 - Studio Cut v1 is an opt-in v2 brief extension. It plans five or more beats through the existing FilmSpec compiler, uses aspect-specific copy and screen regions, and stages ceramic geometry in the existing Three.js scene. The same CLI can switch copy, media, logo, color, framing, motion and ratio. A Contour variant exercised those controls with generated media. [Operator playbook](FACTORY_OPERATOR_PLAYBOOK.md)
@@ -31,7 +40,7 @@
 - Stage A audit and retained scratch evidence are under D:/AntiGravity/Studio/uvf-closeout-02-evidence. Baseline SHA was 59a08585c6bddf9fcfde454f68d8af2b33a5f8a6.
 - Package 1 implementation was 3657aef102502941f9f072b77bac40f4734fd602. Evidence is under D:/AntiGravity/Studio/uvf-closeout-02-stage-b1/final. The director accepted the package's technical gate. M2 creative approval is still pending. The three silent 16-second fixture exports and all protected-file rules carry forward.
 
-## Proposed Package 5
+## Proposed Package 5 · held by the director
 
 **Goal.** Establish a reproducible delivery profile and complete one authorized, rights-cleared client pilot. Start with the director's review of Fieldnote. Use that feedback to decide whether the proposition needs a distinct asset and whether phone-size feature close-ups need a reusable treatment.
 
