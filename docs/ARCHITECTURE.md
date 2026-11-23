@@ -2,6 +2,8 @@
 
 VeloraFrame Engine turns a typed film specification into frame-driven Remotion compositions. The factory also accepts versioned client briefs, validates local assets, and maps editorial choices to the existing FilmSpec compiler. See the [factory operator playbook](FACTORY_OPERATOR_PLAYBOOK.md) for CLI workflows and evidence paths.
 
+The Factory enforces the [production acceptance gates](CREATIVE_ACCEPTANCE_GATES.md) at master render and final handoff. The [capability catalog](ENGINE_CAPABILITY_CATALOG.md) records engine features and their verification evidence.
+
 ## Current boundaries
 
 | Area | Owners and responsibilities |

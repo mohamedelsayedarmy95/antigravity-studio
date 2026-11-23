@@ -16,6 +16,9 @@ export function isPortablePath(path: string): boolean {
 const assetPath = z.string().transform((value) => value.replaceAll("\\", "/"))
   .refine(isPortablePath, "Use a project-relative path without traversal, drive names or Windows device names");
 const copy = z.string().trim().min(1).max(240);
+export const renderRightsSchema = z.strictObject({
+  origin: z.enum(["synthetic", "client"]), approved: z.literal(true), license: copy, privacy: copy,
+});
 const id = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(64)
   .refine((name) => !windowsDevice.test(name), "Use a portable project name");
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -74,7 +77,7 @@ const v2 = z.strictObject({
   durationSeconds: z.number().int().min(6).max(90).default(15),
   fps: z.union([z.literal(30), z.literal(60)]).default(60),
   aspectRatios: ratios.default(["9:16", "16:9", "1:1"]),
-  renderRights: z.strictObject({ origin: z.enum(["synthetic", "client"]), approved: z.literal(true), license: copy, privacy: copy }).optional(),
+  renderRights: renderRightsSchema.optional(),
   editorial: editorial.optional(),
 }).superRefine((value, ctx) => {
   if (value.editorial?.template !== "studio-cut-v2" || value.editorial.motion !== "expressive") {

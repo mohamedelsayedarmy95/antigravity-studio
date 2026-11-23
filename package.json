@@ -54,6 +54,7 @@
     "validate-springs": "tsx scripts/validateSprings.ts",
     "stills": "tsx scripts/stills.ts",
     "factory": "tsx scripts/factory.ts",
+    "validate:production": "tsx scripts/validate-production.ts",
     "test": "tsx --test tests/*.test.ts",
     "test:factory": "tsx --test tests/factory.integration.ts",
     "test:factory-render": "tsx --test tests/factory-render.integration.ts"

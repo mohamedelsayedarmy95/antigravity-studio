@@ -170,6 +170,9 @@ export function compileFilm(input: FilmSpecInput): CompiledFilm {
       }
     });
     s.world.nodes.forEach((n, ni) => {
+      if (n.type === "morph" && n.keys.length !== n.shapes.length) {
+        issues.push(`timeline.${i}.world.nodes.${ni}: morph shapes and keys must have the same length.`);
+      }
       if (n.type !== "particles" || !n.form || !("node" in n.form.target)) return;
       const targetId = n.form.target.node;
       const target = s.world.nodes.find((x) => x.id === targetId);

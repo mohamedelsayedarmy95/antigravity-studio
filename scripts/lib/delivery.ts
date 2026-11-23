@@ -2,26 +2,26 @@ import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { constants, createWriteStream } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, readFile, realpath, rename, rmdir, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
+import { renderRightsSchema } from "../../src/engine/client/brief";
 import { copyWithoutAccessUpdate, isWithin, mediaSha256 } from "./client-media";
 import { factoryEncoding, verifyFactoryMp4 } from "./client-render";
+import { verifyProductionEvidence } from "./production";
 
 const fps = 30;
 const deliveryEncoder = {
   codec: "h264", h264Profile: "high", colorSpace: "bt709", pixelFormat: "yuv420p",
   fps, crf: 18, preset: "medium", maxVideoBitrateBps: 8_000_000, bufferBits: 16_000_000,
 } as const;
-const masterRights = z.strictObject({
-  origin: z.enum(["synthetic", "client"]), approved: z.literal(true),
-  license: z.string().trim().min(1).max(240), privacy: z.string().trim().min(1).max(240),
-});
 const masterReceipt = z.object({
   schemaVersion: z.literal("1"), profile: z.literal("master"), frame: z.null(),
   frames: z.undefined().optional(), sourceFrameRange: z.undefined().optional(),
   rightsDeclaration: z.unknown(), encoder: z.record(z.string(), z.unknown()),
+  production: z.unknown().optional(), reviewSheets: z.unknown().optional(), editorial: z.unknown().optional(),
   files: z.array(z.object({
     filename: z.string(), sha256: z.string().regex(/^[a-f0-9]{64}$/),
     aspect: z.enum(["16x9", "9x16", "1x1"]), qa: z.record(z.string(), z.unknown()),
@@ -71,7 +71,7 @@ async function readMasterReceipt(file: string, filename: string) {
   catch { throw new Error("Master render-report.json is unreadable or malformed"); }
   const parsed = masterReceipt.safeParse(data);
   if (!parsed.success) throw new Error("A full master render-report.json is required");
-  if (!masterRights.safeParse(parsed.data.rightsDeclaration).success) {
+  if (!renderRightsSchema.safeParse(parsed.data.rightsDeclaration).success) {
     throw new Error("Master receipt requires an affirmative operator render rights declaration");
   }
   if (!isDeepStrictEqual(parsed.data.encoder, factoryEncoding("master", fps))) {
@@ -83,7 +83,8 @@ async function readMasterReceipt(file: string, filename: string) {
   if (entry.filename !== filename) throw new Error("Master receipt filename does not match the selected MP4");
   const expectedFrames = Number(entry.qa.nb_frames);
   if (!Number.isSafeInteger(expectedFrames) || expectedFrames < 1) throw new Error("Master receipt has invalid frame-count QA");
-  return { ...entry, expectedFrames, audio: entry.qa.audio !== undefined };
+  return { ...entry, expectedFrames, audio: entry.qa.audio !== undefined,
+    production: parsed.data.production, reviewSheets: parsed.data.reviewSheets, editorial: parsed.data.editorial };
 }
 
 const localMp4Input = (file: string) => ["-protocol_whitelist", "file", "-f", "mov", "-enable_drefs", "0", "-i", file];
@@ -116,26 +117,61 @@ function audioPacketHash(input: string) {
 }
 
 const ignoreMissing = (error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; };
+type DeliverySource = Awaited<ReturnType<typeof resolveDeliveryMaster>>;
 
-export async function deliverFactoryMaster(source: Awaited<ReturnType<typeof resolveDeliveryMaster>>, output: string) {
+async function inspectMaster(source: DeliverySource, inputReceipt: string, inputMaster: string, evidence?: string, release = false) {
+  await snapshot(source.receipt, inputReceipt);
+  const selected = await readMasterReceipt(inputReceipt, path.basename(source.master));
+  await snapshot(source.master, inputMaster);
+  if (await mediaSha256(inputMaster) !== selected.sha256) throw new Error("Master SHA-256 differs from the render receipt");
+  await requireMp4Header(inputMaster);
+  const { aspect, expectedFrames, audio } = selected;
+  const inputQa = verifyFactoryMp4(inputMaster, aspect, fps, expectedFrames, audio, deliveryEncoder.h264Profile);
+  if (!isDeepStrictEqual(inputQa, selected.qa)) throw new Error("Master QA differs from the render receipt");
+  const production = evidence ? await verifyProductionEvidence({
+    record: selected.production, reviewSheets: selected.reviewSheets, editorial: selected.editorial,
+    batch: source.batch, evidenceFile: evidence, aspect, masterHash: selected.sha256,
+    frames: expectedFrames, audio: inputQa.audio, release,
+  }) : undefined;
+  return { selected, production, inputQa };
+}
+
+export async function validateFactoryMaster(source: DeliverySource, evidence: string) {
+  const scratch = await mkdtemp(path.join(await realpath(tmpdir()), "factory-verify-"));
+  const inputReceipt = path.join(scratch, "master-report.json");
+  const inputMaster = path.join(scratch, "master.mp4");
+  try {
+    return (await inspectMaster(source, inputReceipt, inputMaster, evidence)).production;
+  } finally {
+    for (const file of [inputMaster, inputReceipt]) await unlink(file).catch(ignoreMissing);
+    await rmdir(scratch).catch(ignoreMissing);
+  }
+}
+
+export async function deliverFactoryMaster(source: DeliverySource, output: string, releaseEvidence?: string) {
   if (isWithin(source.batch, output)) throw new Error("Delivery output must be outside the master batch");
   const scratch = await mkdtemp(path.join(output, ".delivery-"));
   const prepared = path.join(scratch, "prepared");
   const inputReceipt = path.join(scratch, "master-report.json");
   const inputMaster = path.join(scratch, "master.mp4");
-  const video = path.join(prepared, "review.mp4");
+  const video = path.join(prepared, releaseEvidence ? "master.mp4" : "review.mp4");
   const receipt = path.join(prepared, "delivery-report.json");
   try {
-    await snapshot(source.receipt, inputReceipt);
-    const selected = await readMasterReceipt(inputReceipt, path.basename(source.master));
-    await snapshot(source.master, inputMaster);
-    if (await mediaSha256(inputMaster) !== selected.sha256) throw new Error("Master SHA-256 differs from the render receipt");
-    await requireMp4Header(inputMaster);
+    const { selected, production, inputQa } = await inspectMaster(source, inputReceipt, inputMaster, releaseEvidence, Boolean(releaseEvidence));
     const { aspect, expectedFrames, audio } = selected;
-    const inputQa = verifyFactoryMp4(inputMaster, aspect, fps, expectedFrames, audio, deliveryEncoder.h264Profile);
-    if (!isDeepStrictEqual(inputQa, selected.qa)) throw new Error("Master QA differs from the render receipt");
-
     await mkdir(prepared);
+    if (production === "final-audio") {
+      await rename(inputMaster, video);
+      await writeFile(receipt, JSON.stringify({
+        schemaVersion: "1", purpose: "final-audio-local-handoff", technical: "pass",
+        creativeApproval: "director-declared", audioRights: "operator-evidence-recorded",
+        publicationClearance: "not-established", encoder: factoryEncoding("master", fps),
+        output: { filename: "master.mp4", aspect, frames: expectedFrames, sha256: selected.sha256, qa: inputQa },
+      }, null, 2) + "\n", { flag: "wx" });
+      const destination = path.join(output, "final-" + randomUUID());
+      await rename(prepared, destination);
+      return destination;
+    }
     ffmpeg([
       ...localMp4Input(inputMaster), "-map", "0:v:0", ...(audio ? ["-map", "0:a:0", "-c:a", "copy"] : ["-an"]),
       "-map_metadata", "-1", "-map_metadata:s", "-1", "-map_chapters", "-1",
