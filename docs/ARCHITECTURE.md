@@ -18,6 +18,15 @@ VeloraFrame Engine turns a typed film specification into frame-driven Remotion c
 
 ## Compatibility and development
 
-Preserve existing composition IDs, legacy editorial modes, and supported brief and FilmSpec versions. Drive animation from the current frame and a stable seed where applicable. Verify scoped rendering changes with repeated PNG stills and adjacent motion samples. Keep local fonts, the client media boundary, and render-readiness behavior intact.
+Preserve the registered M1 and M2 IDs for all three aspects, `FactoryFilm`, and `GpuProbe`, along with legacy editorial modes and supported brief and FilmSpec versions. Drive animation from the current frame and a stable seed where applicable. Verify scoped rendering changes with repeated PNG stills and adjacent motion samples. Keep local fonts, the client media boundary, and render-readiness behavior intact.
+
+The v1 engine migration intentionally retired the pre-engine demo IDs without aliases. To render a new client film, use `FactoryFilm` with a validated brief compiled to FilmSpec via the factory CLI.
+
+| Retired composition IDs | Reusable capabilities in v1 |
+| --- | --- |
+| `DeviceShowcase` | The shared screen layer presents validated screenshots and recordings with fit, crop, and frame-indexed playback. Screen geometry tests and the factory render integration cover this path. The iPhone-specific `IphoneMockup` and `ScreenCompositor` APIs, simulated iOS chrome, and `SaveFixMockScreen` were retired with the demo. |
+| `AudioReactiveShowcase` | The procedural `useAudioReactive` and FFT-based `useRealAudioReactive` hooks remain available in `src/audio`. The standalone spectrum visualizer was retired. Engine beat timing and editorial audio assembly have separate tests. |
+| `Phase2MotionShowcase`, `SequentialSceneTest` | `src/motion/MotionPrimitives.tsx` retains the shared 2D motion primitives. The demo CSS transforms `PerspectiveTilt` and `SpatialFlip3D` were retired. FilmSpec drives spatial transforms through the 3D stage and scene sequencing through the compiler. Engine and stage-boundary tests cover tracks, cuts, and transitions. |
+| `HelloWorld`, `Logo`, `Title` | Remotion starter compositions were retired. M1 and M2 provide the built-in engine demonstrations. |
 
 Use the Node version in `.nvmrc` and the pnpm version in `package.json`. The quality workflow runs lint with TypeScript, unit tests, and the factory CLI integration suite. The separate render integration and targeted frame checks cover the rendering path locally.
