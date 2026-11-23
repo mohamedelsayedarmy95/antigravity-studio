@@ -1,54 +1,20 @@
-# Remotion video
+# VeloraFrame Studio
 
-<p align="center">
-  <a href="https://github.com/remotion-dev/logo">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-dark.apng">
-      <img alt="Animated Remotion Logo" src="https://github.com/remotion-dev/logo/raw/main/animated-logo-banner-light.gif">
-    </picture>
-  </a>
-</p>
-
-Welcome to your Remotion project!
+VeloraFrame Engine turns validated product briefs and typed film specifications into cinematic motion graphics with Remotion and Three.js.
+See the [engine architecture](docs/ARCHITECTURE.md) and the [reproducible Relay example](examples/studio-cut-demo/README.md).
 
 ## Commands
 
-**Install Dependencies**
+Use the Node version in `.nvmrc` and the pnpm version in `package.json`. Corepack selects the pinned pnpm version when invoked as `corepack pnpm`. Factory and delivery checks require FFmpeg and FFprobe on PATH.
 
-```console
-npm i --loglevel=error
-```
+| Command | What it does |
+| :--- | :--- |
+| `pnpm install --frozen-lockfile --ignore-scripts` | Install pinned dependencies (store: `D:\.pnpm-store`) |
+| `pnpm dev` | Remotion Studio |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm probe` | Probe headless GPU backends; writes `.cache/gl-profile.json` |
+| `pnpm determinism <CompositionId>` | Byte-identity and scrub-safety check on rendered frames |
 
-**Start Preview**
-
-```console
-npm run dev
-```
-
-**Render video**
-
-```console
-npx remotion render
-```
-
-**Upgrade Remotion**
-
-```console
-npx remotion upgrade
-```
-
-## Docs
-
-Get started with Remotion by reading the [fundamentals page](https://www.remotion.dev/docs/the-fundamentals).
-
-## Help
-
-We provide help on our [Discord server](https://discord.gg/6VzzNDwUwV).
-
-## Issues
-
-Found an issue with Remotion? [File an issue here](https://github.com/remotion-dev/remotion/issues/new).
-
-## License
-
-Note that for some entities a company license is needed. [Read the terms here](https://github.com/remotion-dev/remotion/blob/main/LICENSE.md).
+## Rendering rules
+- GL backend is `angle` (verified: hardware Radeon via Direct3D 11). `angle-egl` and `swangle` fall back to software on this machine.
+- Every animated value must be a pure function of the current frame. No `Math.random`, no clock reads, no self-animating helpers.

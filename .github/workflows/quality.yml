@@ -1,0 +1,42 @@
+name: Quality
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install JavaScript dependencies
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Provision FFmpeg for synthetic media tests
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'ffmpeg-9.1-essentials_build.7z'
+          Invoke-WebRequest 'https://github.com/GyanD/codexffmpeg/releases/download/9.1/ffmpeg-9.1-essentials_build.7z' -TimeoutSec 180 -OutFile $archive
+          $expected = '835b9a733445ba7a56a37a26cf7bde84e2f3ce7da2a8ec984276bb2abb1b922c'
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expected) {
+            throw 'Unexpected FFmpeg archive checksum.'
+          }
+          tar.exe -xf $archive -C $env:RUNNER_TEMP
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $bin = Join-Path $env:RUNNER_TEMP 'ffmpeg-9.1-essentials_build/bin'
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $bin -Encoding utf8
+
+      - name: Lint and typecheck
+        run: corepack pnpm run lint
+      - name: Unit tests
+        run: corepack pnpm run test
+      - name: Factory CLI integration
+        run: corepack pnpm run test:factory

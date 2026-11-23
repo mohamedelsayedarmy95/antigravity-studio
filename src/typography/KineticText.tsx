@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { useCurrentFrame, useVideoConfig, interpolate } from "remotion";
-import { appSpring, SpringPresetName } from "../motion/springPresets";
+import { appSpring, getPresetDurationInFrames, SpringPresetName } from "../motion/springPresets";
 import { FONT_FAMILIES } from "./fonts";
 
 export type TextSplitMode = "words" | "chars" | "lines";
@@ -58,6 +58,7 @@ export const KineticText: React.FC<KineticTextProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const settleFrames = useMemo(() => getPresetDurationInFrames(preset, fps), [preset, fps]);
 
   // Tokenize text based on split mode
   const tokens = useMemo<TextToken[]>(() => {
@@ -75,22 +76,38 @@ export const KineticText: React.FC<KineticTextProps> = ({
       rawTokens = Array.from(children);
     }
 
+    // Character ranges covered by each highlight phrase. A token is highlighted only when its
+    // own range overlaps one of these, so "AI" in "AI Life" no longer lights up every "a".
+    const highlightRanges: Array<{ start: number; end: number; rule: HighlightRule }> = [];
+    for (const rule of highlights) {
+      if (!rule.text) continue;
+      let from = children.indexOf(rule.text);
+      while (from !== -1) {
+        highlightRanges.push({ start: from, end: from + rule.text.length, rule });
+        from = children.indexOf(rule.text, from + rule.text.length);
+      }
+    }
+
     let tokenIndex = 0;
+    let charOffset = 0;
     return rawTokens.map((raw) => {
       const isSpace = /^\s+$/.test(raw);
       const currentIndex = isSpace ? -1 : tokenIndex++;
+      const tokenStart = charOffset;
+      const tokenEnd = charOffset + raw.length;
+      // "lines" mode drops the "\n" separators when splitting; account for them.
+      charOffset = tokenEnd + (split === "lines" ? 1 : 0);
 
-      // Check if this token matches any highlight rule
       let isHighlighted = false;
       let highlightStyle: React.CSSProperties | undefined;
       let highlightClass: string | undefined;
 
-      for (const rule of highlights) {
-        if (raw.includes(rule.text) || rule.text.includes(raw)) {
+      if (!isSpace) {
+        const hit = highlightRanges.find((r) => r.start < tokenEnd && r.end > tokenStart);
+        if (hit) {
           isHighlighted = true;
-          highlightStyle = rule.style;
-          highlightClass = rule.className;
-          break;
+          highlightStyle = hit.rule.style;
+          highlightClass = hit.rule.className;
         }
       }
 
@@ -135,7 +152,9 @@ export const KineticText: React.FC<KineticTextProps> = ({
               delay,
             });
 
-        const isSettled = !isPending && frame > delay + 22 && progress >= 0.995;
+        // Settle time comes from the preset's measured spring, not a fixed 22 frames,
+        // so slow presets (e.g. headspaceGentle) no longer snap before they finish.
+        const isSettled = !isPending && frame > delay + settleFrames && progress >= 0.995;
 
         const translateY = isSettled
           ? 0

@@ -1,99 +1,54 @@
 import "./index.css";
 import { Composition, Folder } from "remotion";
-import { HelloWorld } from "./HelloWorld";
-import { Logo } from "./HelloWorld/Logo";
-import { Title } from "./HelloWorld/Title";
-import { Phase2MotionShowcase } from "./compositions/Phase2MotionShowcase";
-import { AudioReactiveShowcase } from "./compositions/AudioReactiveShowcase";
-import { SequentialSceneTest } from "./compositions/SequentialSceneTest";
-import { DeviceShowcase } from "./compositions/DeviceShowcase";
+import { compileFilm } from "./engine/compile/compile";
+import { Film, type FilmProps } from "./engine/Film";
+import { FILMS } from "./films";
+import { GpuProbe } from "./probe/GpuProbe";
+import { ASPECTS } from "./stage3d/schema";
 
-// Each <Composition> is an entry in the sidebar!
-
+/** Films × aspects are registered from data; adding a film never touches this file. */
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      <Folder name="Phase3-Devices">
+      <Folder name="VeloraFrame-Studio">
+        {FILMS.map((spec) => {
+          const compiled = compileFilm(spec);
+          return (
+            <Folder key={compiled.spec.id} name={compiled.spec.id}>
+              {compiled.spec.output.aspects.map((aspect) => (
+                <Composition
+                  key={aspect}
+                  id={`${compiled.spec.id}-${aspect}`}
+                  component={Film}
+                  durationInFrames={compiled.durationInFrames}
+                  fps={compiled.fps}
+                  width={ASPECTS[aspect].width}
+                  height={ASPECTS[aspect].height}
+                  defaultProps={{ spec }}
+                />
+              ))}
+            </Folder>
+          );
+        })}
         <Composition
-          id="DeviceShowcase"
-          component={DeviceShowcase}
-          durationInFrames={600}
+          id="FactoryFilm"
+          component={Film}
+          durationInFrames={1}
           fps={60}
           width={1920}
           height={1080}
-        />
-      </Folder>
-
-      <Folder name="Phase2-Motion-Typography">
-        <Composition
-          id="Phase2MotionShowcase"
-          component={Phase2MotionShowcase}
-          durationInFrames={360}
-          fps={60}
-          width={1920}
-          height={1080}
-        />
-        <Composition
-          id="AudioReactiveShowcase"
-          component={AudioReactiveShowcase}
-          durationInFrames={600}
-          fps={60}
-          width={1920}
-          height={1080}
-        />
-        <Composition
-          id="SequentialSceneTest"
-          component={SequentialSceneTest}
-          durationInFrames={360}
-          fps={60}
-          width={1920}
-          height={1080}
-        />
-      </Folder>
-
-      <Folder name="Elements">
-        <Composition
-          id="Logo"
-          component={Logo}
-          durationInFrames={150}
-          fps={30}
-          width={1920}
-          height={1080}
-          defaultProps={{
-            logoColor1: "#91EAE4",
-            logoColor2: "#86A8E7",
-          }}
-        />
-        <Composition
-          id="Title"
-          component={Title}
-          durationInFrames={115}
-          fps={30}
-          width={1920}
-          height={1080}
-          defaultProps={{
-            titleText: "Welcome to Remotion",
-            titleColor: "#000000",
+          defaultProps={{ spec: FILMS[0] } satisfies FilmProps}
+          calculateMetadata={({ props }: { props: FilmProps }) => {
+            const compiled = compileFilm(props.spec);
+            const aspect = props.aspect ?? compiled.spec.output.aspects[0];
+            if (!compiled.spec.output.aspects.includes(aspect)) throw new Error("Aspect is outside the validated factory plan");
+            return { ...ASPECTS[aspect], durationInFrames: compiled.durationInFrames, fps: compiled.fps };
           }}
         />
       </Folder>
-      <Composition
-        // You can take the "id" to render a video:
-        // bunx remotion render HelloWorld
-        id="HelloWorld"
-        component={HelloWorld}
-        durationInFrames={150}
-        fps={30}
-        width={1920}
-        height={1080}
-        // You can override these props for each render:
-        // https://www.remotion.dev/docs/parametrized-rendering
-        defaultProps={{
-          titleText: "Welcome to Remotion",
-          titleColor: "#000000",
-        }}
-      />
-
+      <Folder name="Diagnostics">
+        <Composition id="GpuProbe" component={GpuProbe} durationInFrames={60} fps={60} width={1280} height={720} />
+      </Folder>
     </>
   );
 };
