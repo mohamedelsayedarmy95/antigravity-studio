@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm, unlink, utimes, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -80,6 +80,19 @@ test("factory CLI scans local stills and videos, publishes deterministic reports
   const missing = factory("validate", "--project", project, "--out", out);
   assert.equal(missing.code, 1, missing.output);
   assert.match(missing.output, /features\.0\.asset.*feature\.mp4/);
+});
+
+test("a resolved report path inside the project gets the actionable refusal", async (t) => {
+  const scratch = await mkdtemp(path.join(tmpdir(), "factory report alias "));
+  t.after(() => rm(scratch, { recursive: true, force: true }));
+  const project = path.join(scratch, "project");
+  const alias = path.join(scratch, "alias");
+  await mkdir(project);
+  await symlink(project, alias, process.platform === "win32" ? "junction" : "dir");
+  const result = factory("scan", "--project", project, "--out", path.join(alias, "reports"));
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /outside the input project.*resolves inside/);
+  await assert.rejects(lstat(path.join(project, "reports")), { code: "ENOENT" });
 });
 
 test("Windows snapshots report one unreadable source and continue with later inputs", { skip: process.platform !== "win32" }, async (t) => {

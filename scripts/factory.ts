@@ -101,7 +101,7 @@ async function resolveEvidenceDirectory(project: string, output: string, rejectL
   const resolvedAncestor = await realpath(ancestor);
   if (rejectLinks && path.relative(ancestor, resolvedAncestor) !== "") throw new Error("Delivery output may not use links or junctions");
   const destination = path.join(resolvedAncestor, path.relative(ancestor, absolute));
-  if (isWithin(project, destination)) throw new Error("Report destination resolves inside the input project.");
+  if (isWithin(project, destination)) throw new Error("Reports must be written outside the input project. This path resolves inside it.");
   await mkdir(destination, { recursive: true });
   return destination;
 }
