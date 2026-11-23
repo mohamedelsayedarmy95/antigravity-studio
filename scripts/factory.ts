@@ -10,6 +10,7 @@ import type { FactoryFrameRange, FactoryRenderProfile } from "./lib/client-rende
 
 const root = path.resolve(import.meta.dirname, "..");
 const usage = [
+  "VeloraFrame Studio | Factory",
   "pnpm factory init --name <new-project> --template mobile-app [--parent <folder>]",
   "pnpm factory scan --project <folder> [--assets-dir <relative-folder> | --brief <file>] [--out <folder>]",
   "pnpm factory validate --project <folder> [--brief <file>] [--out <folder>]",
@@ -49,7 +50,7 @@ async function createProject(name: string, parent?: string) {
     }
     for (const [file, content] of [
       ["brief.json", json(brief)],
-      ["README.md", "# Client project\n\nPlace your screenshots and recordings in assets/screenshots. Update the relative hero and feature asset filenames in brief.json, then run factory scan and validate from the studio-engine checkout. The starter names are placeholders.\n"],
+      ["README.md", "# Client project\n\nPlace your screenshots and recordings in assets/screenshots. Update the relative hero and feature asset filenames in brief.json, then run factory scan and validate from the VeloraFrame Studio checkout. The starter names are placeholders.\n"],
     ]) {
       const fullPath = path.join(destination, file);
       await writeFile(fullPath, content, { flag: "wx" });

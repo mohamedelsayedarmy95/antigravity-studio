@@ -1,5 +1,5 @@
 /**
- * CPOS creative shot grammar for Studio Cut v2 / expressive only.
+ * VeloraFrame creative shot grammar for Studio Cut v2 / expressive only.
  * Frame-addressable (no global state), source-accurate (never simulates UI state), and
  * bounded to the existing editorial media rectangle. Rendering remains seek-order independent.
  */
@@ -25,6 +25,7 @@ export type StudioScreenMotion = Readonly<{
  */
 export function studioScreenMotion(
   shotId: string, localFrame: number, shotFrames: number, shortSide: number, fps: number,
+  obsidian = false,
 ): StudioScreenMotion {
   const recipe = studioRecipeFor(shotId);
   const seconds = Math.max(0, localFrame) / Math.max(1, fps);
@@ -51,6 +52,11 @@ export function studioScreenMotion(
     y = -magnitude * 0.012 * settle;
     rotation = side * 0.95 * settle;
     scale = 0.965 + 0.035 * enter + 0.008 * drift;
+  }
+  if (obsidian) {
+    // The plate and its annotations share a small perspective move. The source crop stays registered.
+    const yaw = (odd || recipe === "solution-reveal" ? -1 : 1) * 7 * settle;
+    return { recipe, transform: `perspective(${fixed(Math.max(1, magnitude) * 1.7)}px) translate3d(${fixed(x)}px, ${fixed(y)}px, 0) rotateY(${fixed(yaw)}deg) rotate(${fixed(rotation)}deg) scale(${fixed(scale)})` };
   }
   return {
     recipe,

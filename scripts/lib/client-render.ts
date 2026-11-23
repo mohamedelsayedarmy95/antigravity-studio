@@ -210,7 +210,7 @@ export async function renderClient(input: {
     for (const aspect of aspects) {
       const inputProps: FilmProps = { spec: plan.filmSpec, aspect, screens,
         ...(editorial ? { editorial: { logoFile, motion: editorial.motion, safeAreas: editorial.safeAreas,
-          template: editorial.template, direction: editorial.direction } } : {}) };
+          template: editorial.template, direction: editorial.direction, artDirection: editorial.artDirection } } : {}) };
       const browserOptions = { serveUrl: bundleDir, inputProps, chromiumOptions, browserExecutable: browser };
       const composition = await selectComposition({ id: "FactoryFilm", ...browserOptions });
       const start = Date.now();

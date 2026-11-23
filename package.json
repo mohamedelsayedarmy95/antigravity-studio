@@ -1,13 +1,14 @@
 {
-  "name": "studio-engine",
+  "name": "veloraframe-studio",
   "version": "1.0.0",
-  "description": "Universal Capability Engine: config-driven cinematic motion graphics (Remotion + R3F)",
+  "description": "VeloraFrame Engine for reusable cinematic production with Remotion and Three.js",
   "repository": {},
   "license": "UNLICENSED",
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24"
   },
   "private": true,
+  "packageManager": "pnpm@12.21.0",
   "dependencies": {
     "@react-three/drei": "10.7.9",
     "@react-three/fiber": "9.8.2",

@@ -125,7 +125,9 @@ export const TextView: React.FC<{
 }> = ({ el, look, palette, boxWidth, align, seed }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const base = typeStyle(el.role, look, { width, height });
+  const baseStyle = typeStyle(el.role, look, { width, height });
+  const needsShaping = /\p{Script=Arabic}/u.test(el.content);
+  const base = needsShaping ? { ...baseStyle, letterSpacing: 0 } : baseStyle;
   const style = { ...base, fontSize: base.fontSize * fitScale(el.content, base, boxWidth) };
   const ink = el.color ? cssColor(el.color, palette) : palette.ink;
   const accent = palette.accent;
@@ -134,6 +136,12 @@ export const TextView: React.FC<{
   const highlights = el.emphasis.map((text) => ({ text, style: { color: accent } }));
   const container: React.CSSProperties = { ...style, color: ink, textAlign: align === "start" ? "left" : align === "end" ? "right" : "center", textWrap: "balance" };
 
+  if (needsShaping) {
+    // Keep joining scripts in a single browser-shaped run throughout the reveal.
+    const progress = reveal === "hold" ? 1 : Math.min(1, Math.max(0, appSpring({ frame, fps, preset: look.spring })));
+    return <div dir="auto" style={{ ...container, opacity: progress,
+      transform: `translateY(${(1 - progress) * fontSize * 0.26}px)` }}>{el.content}</div>;
+  }
   if (reveal === "hold") return <div style={container}>{el.content}</div>;
   if (reveal === "scramble") {
     return <div style={container}><Scramble text={el.content} mask={emphasisMask(el.content, el.emphasis)} ink={ink} accent={accent} seed={hashString(`${seed}/${el.content}`)} /></div>;

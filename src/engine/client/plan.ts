@@ -79,7 +79,7 @@ export function planProject(brief: ClientBrief, assets: readonly AssetForPlan[])
         }
         results.set(beat.id, { ...result, localFrame, movieFrame: shotStart + localFrame });
       }
-      return studioScene(beat, length, studio.motion, studio.template, studio.closingStatement, results.get(beat.id));
+      return studioScene(beat, length, studio.motion, studio.template, studio.closingStatement, results.get(beat.id), studio.artDirection);
     }
     return {
       id: beat.id, length, transitionIn: { type: "cut" },
@@ -122,6 +122,7 @@ export function planProject(brief: ClientBrief, assets: readonly AssetForPlan[])
       template: studio.template, logo: studio.logo, audio: studio.audio, motion: studio.motion,
       safeAreas: byAspect(studio.safeAreas),
       ...(studio.direction ? { direction: studio.direction } : {}),
+      ...(studio.artDirection ? { artDirection: studio.artDirection } : {}),
       ...(soundCues?.length ? { resolvedSoundCues: soundCues } : {}),
       cues: shots.map((shot) => ({ scene: shot.id, frame: shot.startFrame })),
     } } : {}),

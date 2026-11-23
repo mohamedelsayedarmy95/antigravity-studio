@@ -25,7 +25,7 @@ export type ColorRef = z.infer<typeof ColorRefSchema>;
 /** Shapes with a shared (u,v) parameterization; any of them can morph into any other. */
 export const MorphShapeSchema = z.enum(["sphere", "icosahedron", "roundedBox", "torus", "torusKnot"]);
 export type MorphShape = z.infer<typeof MorphShapeSchema>;
-export const PrimitiveShapeSchema = z.union([MorphShapeSchema, z.enum(["capsule", "cylinder", "plane"])]);
+export const PrimitiveShapeSchema = z.union([MorphShapeSchema, z.enum(["capsule", "cylinder", "plane", "sweptSheet"])]);
 export type PrimitiveShape = z.infer<typeof PrimitiveShapeSchema>;
 
 export const MaterialPresetSchema = z.enum([

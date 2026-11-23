@@ -1,2 +1,5 @@
+# Corepack selects the project pin without adding a pnpm bootstrap lockfile document.
+pmOnFail: ignore
+
 allowBuilds:
   esbuild: false

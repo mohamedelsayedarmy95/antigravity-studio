@@ -460,7 +460,6 @@ export const MomentumSwipe: React.FC<MomentumSwipeProps> = ({
                 flexShrink: 0,
                 opacity: isFocused ? 1 : 0.45,
                 scale: isFocused ? 1 : 0.94,
-                transition: "none",
               }}
             >
               {item}

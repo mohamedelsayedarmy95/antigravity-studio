@@ -5,8 +5,9 @@ export type EditorialInsets = { top: number; right: number; bottom: number; left
 export type EditorialMotion = "measured" | "expressive";
 export type EditorialSafeAreas = Partial<Record<AspectId, EditorialInsets>>;
 export type StudioTemplate = "studio-cut-v1" | "studio-cut-v2";
+export type StudioArtDirection = "obsidian";
 export type EditorialBinding = { safeAreas: EditorialSafeAreas; motion: EditorialMotion; logoFile: string;
-  template?: StudioTemplate; direction?: Record<string, ShotDirection | undefined> };
+  template?: StudioTemplate; artDirection?: StudioArtDirection; direction?: Record<string, ShotDirection | undefined> };
 type Box = readonly [left: number, top: number, width: number, height: number];
 type Spread = { copy: Box; media: Box; align?: "center" };
 

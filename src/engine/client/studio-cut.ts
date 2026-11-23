@@ -2,8 +2,9 @@ import type { ClientBrief } from "./brief";
 import type { FilmSpecInput } from "../schema/film";
 import type { Vec3 } from "../time/animatable";
 import { ASPECTS, type AspectId } from "../../stage3d/schema";
-import { editorialLayout, type EditorialMotion, type EditorialSafeAreas, type StudioTemplate } from "./editorial";
+import { editorialLayout, type EditorialMotion, type EditorialSafeAreas, type StudioArtDirection, type StudioTemplate } from "./editorial";
 import { studioBrandWash, studioExpressivePost } from "./studio-finishing";
+import { obsidianScene, stageObsidian } from "./studio-obsidian";
 
 /** Creative fusion: Qwen's contrast, Gemini's sculptural silhouettes, Claude's shot grammar,
  * Grok's motion variety, and the fifth candidate's strict legacy compatibility.
@@ -131,6 +132,7 @@ export function studioScene(
   template: StudioTemplate,
   closingStatement?: string,
   result?: { localFrame: number; title: string; body: string },
+  artDirection?: StudioArtDirection,
 ): FilmSpecInput["timeline"][number] {
   const closing = beat.id === "cta";
   const hook = beat.id === "hook";
@@ -179,7 +181,7 @@ export function studioScene(
   const art = artFor(beat.id);
   const tone = tones[art.tone];
   const resultAt = result ? `${result.localFrame}f` as const : undefined;
-  return {
+  const scene: FilmSpecInput["timeline"][number] = {
     ...baseline,
     transitionIn: directedTransitions[beat.id as keyof typeof directedTransitions] ?? baseline.transitionIn,
     world: {
@@ -217,6 +219,7 @@ export function studioScene(
         reveal: "hold" as const, exit: "none" as const, color: "#34405b" as const, at: resultAt },
     ] : [])],
   };
+  return artDirection === "obsidian" ? obsidianScene(scene, result?.localFrame) : scene;
 }
 
 /** Preserve legacy staging byte-for-byte. Expressive scene reliefs are identified by
@@ -224,7 +227,7 @@ export function studioScene(
  *  Editorial screen and copy placement is deliberately unchanged until the renderer caller is audited.
  */
 export function stageStudioCut(spec: FilmSpecInput, aspect: AspectId, safeAreas: EditorialSafeAreas, template?: StudioTemplate,
-  motion: EditorialMotion = "measured"): FilmSpecInput {
+  motion: EditorialMotion = "measured", artDirection?: StudioArtDirection): FilmSpecInput {
   const frame = ASPECTS[aspect];
   const shortSide = Math.min(frame.width, frame.height);
   const worldShortSide = 6.35 * 24 / 45;
@@ -244,6 +247,7 @@ export function stageStudioCut(spec: FilmSpecInput, aspect: AspectId, safeAreas:
     const scale = expressiveRelief && typeof lens === "number" && lens > 0 && typeof distance === "number"
       ? (distance + 0.85) * 24 / lens : worldShortSide;
     const { media, eyebrow } = editorialLayout(aspect, frame, scene.id, safeAreas, template, motion);
+    if (artDirection === "obsidian") return stageObsidian(scene, frame, media);
     const centerX = media ? media.left + media.width / 2 : frame.width * 0.88;
     const centerY = media ? media.top + media.height / 2 : frame.height * 0.85;
     const side = centerX >= frame.width / 2 ? 1 : -1;

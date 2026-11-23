@@ -25,6 +25,7 @@ export const ScreenLayer: React.FC<{ compiled: CompiledFilm; screens: Record<str
   const localFrame = frame - Math.round(scene.start * fps);
   const time = localFrame / fps;
   const directed = editorial?.template === "studio-cut-v2";
+  const obsidian = editorial?.artDirection === "obsidian";
   if (layout?.logo && editorial) {
     const { left, top, width: w, height: h } = layout.logo;
     const plate = Math.min(w, h, Math.min(width, height) * 0.192);
@@ -32,7 +33,8 @@ export const ScreenLayer: React.FC<{ compiled: CompiledFilm; screens: Record<str
     const expressiveLogo = directed && editorial.motion === "expressive";
     return <div style={{ position: "absolute", left: left + (w - plate) / 2, top: top + (h - plate) / 2,
       width: plate, height: plate, display: "grid", placeItems: "center", background: "#faf9f6", borderRadius: "24%",
-      border: "1px solid white", boxShadow: "0 17px 60px #07122a7a",
+      border: obsidian ? "1px solid #cce7ff" : "1px solid white",
+      boxShadow: obsidian ? "0 17px 62px #000c, 0 0 42px #849fff54" : "0 17px 60px #07122a7a",
       opacity: continuity,
       transform: `scale(${(expressiveLogo ? 0.86 : 0.9) + arrive * (expressiveLogo ? 0.14 : 0.1)})` }}>
       <Img src={staticFile(editorial.logoFile)} style={{ width: "66%", height: "66%", objectFit: "contain" }}
@@ -53,15 +55,19 @@ export const ScreenLayer: React.FC<{ compiled: CompiledFilm; screens: Record<str
     (1 - applyEase("expoOut", time, 0.56, fps)) * (editorial.motion === "expressive" ? 12 : 7);
   const expressive = editorial?.template === "studio-cut-v2" && editorial.motion === "expressive";
   const recipe = expressive ? studioScreenMotion(scene.id, localFrame, Math.round(scene.length * fps),
-    Math.min(width, height), fps) : undefined;
+    Math.min(width, height), fps, obsidian) : undefined;
   const chrome: React.CSSProperties = editorial ? {
     background: "#fcfcfb", borderRadius: Math.min(width, height) * 0.024, transform: `translateY(${motion}px)`,
     boxShadow: `0 0 0 1.5px color-mix(in srgb, ${compiled.palette.primary} 23%, #f7f7fd), 0 20px 48px #18264c41`,
+    ...(obsidian ? {
+      background: "#131d31",
+      boxShadow: "0 0 0 2px #a9c4da, 0 0 0 8px #202e42, 0 30px 66px #000b, 0 0 48px #668afa42",
+    } : {}),
   } : {};
   return (
     <div data-factory-screen={scene.id} data-studio-recipe={recipe?.recipe}
       style={{ position: "absolute", ...geometry.viewport, overflow: "hidden", ...chrome,
-        ...(recipe ? { transform: recipe.transform, willChange: "transform" } : {}) }}>
+        ...(recipe ? { transform: recipe.transform, ...(obsidian ? {} : { willChange: "transform" }) } : {}) }}>
       <Img
         key={src}
         src={src}

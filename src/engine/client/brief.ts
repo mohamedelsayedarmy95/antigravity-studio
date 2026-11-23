@@ -45,6 +45,7 @@ const editorial = z.strictObject({
     })).max(8).optional(),
   }),
   motion: z.enum(["measured", "expressive"]).default("measured"),
+  artDirection: z.literal("obsidian").optional(),
   safeAreas: eachRatio(z.strictObject({ top: inset, right: inset, bottom: inset, left: inset })).optional(),
   heroFraming: eachRatio(presentationSchema).optional(),
   direction: z.strictObject({ hook: shotDirectionSchema.optional(), proposition: shotDirectionSchema.optional(),
@@ -77,6 +78,9 @@ const v2 = z.strictObject({
   editorial: editorial.optional(),
 }).superRefine((value, ctx) => {
   if (value.editorial?.template !== "studio-cut-v2" || value.editorial.motion !== "expressive") {
+    if (value.editorial?.artDirection) {
+      ctx.addIssue({ code: "custom", path: ["editorial", "artDirection"], message: "Obsidian requires expressive Studio Cut v2" });
+    }
     value.features.forEach((feature, i) => {
       if (feature.result) ctx.addIssue({ code: "custom", path: ["features", i, "result"],
         message: "Authored results require expressive Studio Cut v2" });

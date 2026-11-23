@@ -1,4 +1,4 @@
-# Factory project setup and validation
+# VeloraFrame Studio factory setup and validation
 
 The factory supports local setup, media inventory, FilmSpec validation, and screen-only preview rendering. Package 3 verifies the pipeline with labeled synthetic material. Client rendering requires licensing and privacy clearance, and production delivery still has separate gates.
 
@@ -11,7 +11,7 @@ The factory supports local setup, media inventory, FilmSpec validation, and scre
 
 ## Start a project
 
-Run from the studio-engine checkout in PowerShell 5.1 or 7.
+Run from the VeloraFrame Studio checkout in PowerShell 5.1 or 7.
 
 ```powershell
 Set-Location 'D:\AntiGravity\Studio\studio-engine'
@@ -33,7 +33,7 @@ pnpm factory scan --project 'D:\My Client Projects\existing-app' --out 'D:\Facto
 pnpm factory validate --project 'D:\My Client Projects\existing-app' --brief 'D:\My Drafts\existing.brief.json' --out 'D:\Factory Reports\existing-app'
 ```
 
-The default destination is the ignored out/factory directory under the studio-engine checkout, with a folder keyed by project location. The CLI prints absolute paths to content-addressed manifest and plan files. Identical reports reuse the same filename. The manifest includes an inventory of all readable candidates, and the plan binds just the hero and feature selections.
+The default destination is the ignored out/factory directory under the VeloraFrame Studio checkout, with a folder keyed by project location. The CLI prints absolute paths to content-addressed manifest and plan files. Identical reports reuse the same filename. The manifest includes an inventory of all readable candidates, and the plan binds just the hero and feature selections.
 
 ## Brief v2
 
@@ -130,7 +130,7 @@ pnpm factory render --project 'D:\My Client Projects\fieldnote' --ratios '16:9,9
 pnpm factory render --project 'D:\My Client Projects\fieldnote' --ratios '16:9,9:16,1:1' --profile preview --out 'D:\Factory Reports\fieldnote'
 ```
 
-Use `--frames` for up to 24 distinct zero-based indices. It produces PNGs without preparing audio. The regular full render uses one cleared music bed. Build or select it against `editorial.cues` in the validated plan. For a 14-second, two-feature brief those cues are frames 0, 60, 135, 225 and 330. Other durations and feature counts produce their own cut list. Allow enough music for the entire film. The factory applies a short head and tail fade, accepts an attenuation from 0 to −24 dB, and enforces −1 dBTP headroom and a broad −60 to −10 LUFS guard. It muxes frame-aligned 48 kHz stereo AAC without re-encoding picture. It does not analyze musical downbeats or mix recording audio, speech or effects. Read the output receipt for the measured loudness, selected logo and audio hashes and published file hashes.
+Use `--frames` for up to 24 distinct zero-based indices. It produces PNGs without preparing audio. The regular full render uses one cleared music bed. Build or select it against `editorial.cues` in the validated plan. For a 14-second, two-feature brief those cues are frames 0, 60, 135, 225 and 330. Other durations and feature counts produce their own cut list. Allow enough music for the entire film. The factory applies a short head and tail fade, accepts an attenuation from 0 to −24 dB, and enforces −1 dBTP headroom and a broad −60 to −10 LUFS guard. It muxes frame-aligned 48 kHz stereo AAC without re-encoding picture. Studio Cut accepts explicit licensed effects in `editorial.audio.cues`. It converts their authored frame offsets to sample positions. Loudness and true peak are measured from the encoded audio. The fixed-BPM preview is procedural, and the separate FFT helper reports frame-local audio energy with a bass-based impulse proxy. The delivery path uses authored cues and does not infer musical downbeats, mix recording audio, or generate speech. Read the output receipt for the measured loudness, selected logo and audio hashes and published file hashes.
 
 ### Agent-neutral operation
 
@@ -138,7 +138,7 @@ Any caller can write the same versioned JSON to a local project and run `factory
 
 ### Directed Studio Cut and export profiles
 
-Use `editorial.template: "studio-cut-v2"` for directed source framing. A distinct `editorial.proposition.asset` can show another source view. Supply `editorial.closingStatement` to display a brand statement followed by the existing brief `cta` as a separate action. Use the actual call to action supplied by the client. The original Studio Cut v1 layout and motion are preserved.
+Use `editorial.template: "studio-cut-v2"` for directed source framing. A distinct `editorial.proposition.asset` can show another source view. Supply `editorial.closingStatement` to display a brand statement followed by the existing brief `cta` as a separate action. Use the actual call to action supplied by the client. The original Studio Cut v1 layout and motion are preserved. Expressive Studio Cut v2 also accepts optional `editorial.artDirection: "obsidian"` for the darker [Relay treatment](../examples/studio-cut-demo/README.md). Omit the field for the existing gallery treatment.
 
 Put optional shot directions under `editorial.direction.hook`, `.proposition`, or the corresponding `feature-1` through `feature-4` key. A `focus` track sets the default. A `byRatio` track replaces it for that output ratio. Focus positions use full-source normalized `x` and `y`, `zoom` uses multiples of the base crop fit, and `at` is a fraction of shot length from the first to the last frame. Start at `0` and list strictly increasing times. Hold a focus by repeating the same position and zoom at a later time. Focus preserves source proportions and holds the last authored key.
 
