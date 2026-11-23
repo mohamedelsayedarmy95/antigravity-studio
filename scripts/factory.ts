@@ -1,21 +1,23 @@
 import { createHash } from "node:crypto";
 import { link, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rmdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { defaultAssetDirectory, isPortablePath, parseBrief, starterBrief } from "../src/engine/client/brief";
 import { planProject } from "../src/engine/client/plan";
 import type { AspectId } from "../src/stage3d/schema";
 import { editorialSource, isWithin, scanProject } from "./lib/client-media";
 import type { FactoryFrameRange, FactoryRenderProfile } from "./lib/client-render";
+import { productionProfile, validateProductionPlan, type ProductionProfile } from "./lib/production";
 
 const root = path.resolve(import.meta.dirname, "..");
 const usage = [
   "VeloraFrame Studio | Factory",
   "pnpm factory init --name <new-project> --template mobile-app [--parent <folder>]",
   "pnpm factory scan --project <folder> [--assets-dir <relative-folder> | --brief <file>] [--out <folder>]",
-  "pnpm factory validate --project <folder> [--brief <file>] [--out <folder>]",
-  "pnpm factory render --project <folder> [--brief <file>] [--ratios 16:9,9:16,1:1] [--profile preview|master] [--frame <number> | --frames <list> | --range <start>:<end>] [--out <folder>]",
-  "pnpm factory deliver --master <factory master MP4> --out <outside master batch>",
+  "pnpm factory validate --project <folder> [--brief <file>] [--production preview|silent-picture|final-audio] [--out <folder>]",
+  "pnpm factory render --project <folder> [--brief <file>] [--ratios 16:9,9:16,1:1] [--profile preview|master] [--production preview|silent-picture|final-audio] [--frame <number> | --frames <list> | --range <start>:<end>] [--out <folder>]",
+  "pnpm factory deliver --master <factory master MP4> --out <outside master batch> [--release --evidence <file>]",
 ].join("\n");
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -111,6 +113,7 @@ async function publish(directory: string, name: string, value: unknown) {
   const filename = path.join(directory, name + "-" + sha256(text) + ".json");
   const scratch = await mkdtemp(path.join(directory, ".report-"));
   const file = path.join(scratch, "report.json");
+  let cleanupError: unknown;
   try {
     await writeFile(file, text, { flag: "wx" });
     try {
@@ -121,14 +124,14 @@ async function publish(directory: string, name: string, value: unknown) {
           !(await lstat(filename)).isFile() || await readFile(filename, "utf8") !== text) throw error;
     }
   } finally {
-    try { await unlink(file); } catch (error) { if (!isMissing(error)) throw error; }
-    await rmdir(scratch);
+    try { await unlink(file); } catch (error) { if (!isMissing(error)) cleanupError = error; }
+    try { await rmdir(scratch); } catch (error) { cleanupError ??= error; }
   }
+  if (cleanupError !== undefined) throw cleanupError;
   console.log((name === "manifest" ? "Manifest" : "Plan") + ": " + filename);
 }
 
-async function main() {
-  const [command, ...args] = process.argv.slice(2);
+export async function runFactory([command, ...args]: string[]) {
   if (command === undefined || command === "--help" || (args.length === 1 && args[0] === "--help")) {
     console.log(usage);
     return;
@@ -140,13 +143,19 @@ async function main() {
     return;
   }
   if (command === "deliver") {
-    const { values } = parseArgs({ args, options: { master: { type: "string" }, out: { type: "string" } } });
+    const { values } = parseArgs({ args, options: {
+      master: { type: "string" }, out: { type: "string" }, release: { type: "boolean" }, evidence: { type: "string" },
+    } });
     if (!values.master || !values.out) throw new Error(usage);
+    if (values.release && !values.evidence || !values.release && values.evidence !== undefined) {
+      throw new Error("Use --release and --evidence <file> together for final handoff");
+    }
     const { resolveDeliveryMaster, deliverFactoryMaster } = await import("./lib/delivery");
     const source = await resolveDeliveryMaster(values.master);
     const output = await resolveEvidenceDirectory(source.batch, values.out, true);
-    const destination = await deliverFactoryMaster(source, output);
-    console.log("Local review: " + path.join(destination, "review.mp4"));
+    const destination = await deliverFactoryMaster(source, output, values.evidence);
+    console.log(values.release ? "final-audio local handoff: " + path.join(destination, "master.mp4") :
+      "Local review: " + path.join(destination, "review.mp4"));
     console.log("Delivery report: " + path.join(destination, "delivery-report.json"));
     return;
   }
@@ -156,10 +165,18 @@ async function main() {
     args, options: {
       project: { type: "string" }, brief: { type: "string" }, "assets-dir": { type: "string" }, out: { type: "string" },
       ratios: { type: "string" }, profile: { type: "string" }, frame: { type: "string" }, frames: { type: "string" }, range: { type: "string" },
+      production: { type: "string" },
     },
   });
   if (!values.project || (values["assets-dir"] !== undefined && (command !== "scan" || values.brief !== undefined)) ||
-      (command !== "render" && (values.ratios !== undefined || values.profile !== undefined || values.frame !== undefined || values.frames !== undefined || values.range !== undefined))) throw new Error(usage);
+      (command !== "render" && (values.ratios !== undefined || values.profile !== undefined || values.frame !== undefined || values.frames !== undefined || values.range !== undefined)) ||
+      (command === "scan" && values.production !== undefined)) throw new Error(usage);
+  let production: ProductionProfile | undefined;
+  if (values.production !== undefined) {
+    const parsed = productionProfile.safeParse(values.production);
+    if (!parsed.success) throw new Error("Production profile must be preview, silent-picture or final-audio");
+    production = parsed.data;
+  }
   const project = await realpath(values.project);
   if (!(await lstat(project)).isDirectory()) throw new Error("--project must be a directory");
   const brief = values["assets-dir"] === undefined
@@ -172,7 +189,11 @@ async function main() {
   if (command === "render") {
     if (!brief?.brief.renderRights) throw new Error("Render requires a renderRights declaration in the brief covering licensing and privacy");
     if (values.profile !== undefined && values.profile !== "preview" && values.profile !== "master") throw new Error("Render profile must be preview or master");
-    profile = values.profile ?? "preview";
+    const requiredProfile = production === "preview" ? "preview" : "master";
+    if (production && values.profile && values.profile !== requiredProfile) {
+      throw new Error("--production " + production + " requires --profile " + requiredProfile);
+    }
+    profile = values.profile ?? (production ? requiredProfile : "preview");
     if (values.frame !== undefined && values.frames !== undefined) throw new Error("Choose --frame or --frames");
     if (values.range !== undefined && (values.frame !== undefined || values.frames !== undefined)) throw new Error("Choose --frame, --frames, or --range");
     if (profile === "master") {
@@ -206,19 +227,24 @@ async function main() {
     throw new Error("Validation requires a usable and unambiguous media catalog.");
   }
   const plan = planProject(brief.brief, manifest.assets);
+  if (production && command === "validate") validateProductionPlan(production, brief.brief, plan, manifest.assets);
   if (plan.editorial) {
     const { logo, audio } = plan.editorial;
-    await Promise.all([
-      editorialSource(project, "logo", logo), editorialSource(project, "audio", audio.file),
-      ...(audio.cues ?? []).map(({ file }) => editorialSource(project, "audio", file)),
-    ]);
+    await editorialSource(project, "logo", logo);
+    if (production !== "silent-picture") {
+      await Promise.all([editorialSource(project, "audio", audio.file),
+        ...(audio.cues ?? []).map(({ file }) => editorialSource(project, "audio", file))]);
+    }
   }
   await publish(output, "plan", {
     ...plan, sourceBriefVersion: brief.sourceVersion, manifestSha256: sha256(json(manifest)),
     clearance: { licensing: manifest.analysis.licensing, privacy: manifest.analysis.privacy },
   });
   console.log("Validated " + plan.shots.length + " shots and " + plan.totalFrames + " frames.");
-  if (command !== "render") return;
+  if (command !== "render") {
+    if (production) console.log(production + " preflight PASS. Render rights are operator-declared.");
+    return;
+  }
 
   const aspects = values.ratios === undefined ? plan.filmSpec.output.aspects :
     values.ratios.split(",").map((ratio) => {
@@ -229,10 +255,12 @@ async function main() {
   if (frames?.some((frame) => frame >= plan.totalFrames)) throw new Error("A requested frame is outside the validated timeline");
   if (frameRange && frameRange[1] >= plan.totalFrames) throw new Error("The requested range is outside the validated timeline");
   const { renderClient } = await import("./lib/client-render");
-  await renderClient({ project, output, brief: brief.brief, plan, manifest, aspects, frames, frameRange, profile });
+  await renderClient({ project, output, brief: brief.brief, plan, manifest, aspects, frames, frameRange, profile, production });
 }
 
-main().catch((error: Error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  runFactory(process.argv.slice(2)).catch((error: Error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

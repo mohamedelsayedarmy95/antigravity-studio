@@ -1,5 +1,7 @@
 # VeloraFrame Studio factory setup and validation
 
+For production preflight, silent picture lock, and final audio handoff, use the [Creative Acceptance Gates](CREATIVE_ACCEPTANCE_GATES.md). The default delivery command continues to produce a local review derivative.
+
 The factory supports local setup, media inventory, FilmSpec validation, and screen-only preview rendering. Package 3 verifies the pipeline with labeled synthetic material. Client rendering requires licensing and privacy clearance, and production delivery still has separate gates.
 
 ## Requirements
@@ -8,6 +10,44 @@ The factory supports local setup, media inventory, FilmSpec validation, and scre
 - Put FFprobe on PATH for scans. FFmpeg is also used by the synthetic integration suite. Check with `ffprobe -version` and `ffmpeg -version`.
 - On Windows the scanner uses Windows PowerShell 5.1 and a local filesystem supporting access-time suppression and hard links. Keep the report destination outside the input project. Allow scratch disk space for the input catalog during probing.
 - Rendering uses FFmpeg, FFprobe and the local Chromium executable pinned by the Remotion setup. Set the process-level UVF_CHROMIUM_EXECUTABLE to an installed executable if the standard local location differs. The render path uses no browser downloads or external assets. Keep preview and scratch space on D: on the reference host.
+
+## Verify a master on the Windows reference workstation
+
+The standalone `validate:production --master` command snapshots the entire MP4 under Node's `os.tmpdir()`. Use a fresh dedicated folder under `D:\AntiGravity\Studio\_GovernanceClosureEvidence`. Check every existing ancestor for reparse points before creating the folder. Budget space for at least one full master copy and the receipt, plus free-space headroom. Use a time limit and a scratch-space monitor for the job. The separate `factory deliver` command stages under `--out`, so keep that destination on the approved volume too.
+
+From the engine checkout, set the temporary paths only for the verification shell and its children. This example assumes `$master` and `$evidence` already point to the exact local inputs.
+
+```powershell
+$base = 'D:\AntiGravity\Studio\_GovernanceClosureEvidence'
+for ($dir = $base; $dir; $dir = Split-Path -Parent $dir) {
+  $entry = Get-Item -LiteralPath $dir -Force -ErrorAction Stop
+  if (!$entry.PSIsContainer -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    throw "Unsafe scratch ancestor: $dir"
+  }
+}
+$required = (Get-Item -LiteralPath $master -ErrorAction Stop).Length + 1GB
+if ([IO.DriveInfo]::new('D').AvailableFreeSpace -lt $required) { throw 'Insufficient D: space' }
+$scratch = Join-Path $base ('master-verification-' + [Guid]::NewGuid().ToString('N'))
+if (Test-Path -LiteralPath $scratch) { throw 'Scratch directory already exists' }
+New-Item -ItemType Directory -Path $scratch -ErrorAction Stop | Out-Null
+$previous = @{}
+try {
+  foreach ($name in 'TEMP', 'TMP', 'TMPDIR') {
+    $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+    [Environment]::SetEnvironmentVariable($name, $scratch, 'Process')
+  }
+  node -e "const f=require('node:fs'),p=require('node:path'),expected=p.resolve(process.argv[1]),actual=f.realpathSync(require('node:os').tmpdir()); if(actual.toLowerCase()!==expected.toLowerCase() || p.parse(actual).root.slice(0,2).toUpperCase()!=='D:') process.exit(1); const file=p.join(actual,'write-probe'); f.writeFileSync(file,'ok',{flag:'wx'}); f.unlinkSync(file); console.log(actual)" $scratch
+  if ($LASTEXITCODE -ne 0) { throw 'Could not establish writable D: scratch for Node' }
+  pnpm validate:production --master $master --evidence $evidence
+  if ($LASTEXITCODE -ne 0) { throw "Master verification failed with exit $LASTEXITCODE" }
+} finally {
+  foreach ($name in $previous.Keys) {
+    [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process')
+  }
+}
+```
+
+Stop if the probe fails, the free-space reserve is unavailable, or the job exceeds its budget. Preserve evidence for troubleshooting. Apply the [human authorization and audio rights gates](CREATIVE_ACCEPTANCE_GATES.md#human-authorization-and-audio-rights) before an external handoff.
 
 ## Start a project
 

@@ -13,6 +13,7 @@ import { copyWithoutAccessUpdate, editorialSource, isWithin, mediaDirectory, med
 import { bundleProject, ROOT } from "./remotion";
 import { muxEditorialAudio, prepareEditorialAudio, verifyEditorialAudio } from "./editorial-audio";
 import { makeMasterReviewSheet, masterReviewFrames } from "./master-review";
+import { validateProductionPlan, verifySamplePixels, type ProductionProfile } from "./production";
 
 type Plan = ReturnType<typeof planProject>;
 type Manifest = Awaited<ReturnType<typeof scanProject>>;
@@ -42,20 +43,6 @@ function mediaCommand(executable: string, args: string[], action: string) {
 
 const ffmpeg = (args: string[], action: string) => mediaCommand("ffmpeg", ["-nostdin", "-v", "error", "-xerror", ...args], action);
 
-function checkSDR(asset: Manifest["assets"][number]) {
-  if (asset.sampleAspectRatio || asset.rotation % 90 !== 0) {
-    throw new Error(asset.path + ": render requires square pixels and right-angle orientation");
-  }
-  // Chromium applies the screenshot's embedded profile when it decodes the original file.
-  if (asset.kind === "image") return;
-  const primaries = asset.color.primaries;
-  const transfer = asset.color.transfer;
-  if ((primaries && !["bt709", "unknown", "unspecified"].includes(primaries)) ||
-      (transfer && !["bt709", "iec61966-2-1", "unknown", "unspecified"].includes(transfer))) {
-    throw new Error(asset.path + ": unsupported color profile. Supply an SDR sRGB or BT.709 derivative.");
-  }
-}
-
 async function prepareScreens(project: string, plan: Plan, manifest: Manifest, scratch: string, publicRoot: string) {
   const assetRoot = await mediaDirectory(project, plan.assetDirectory);
   const catalog = new Map(manifest.assets.map((record) => [record.path, record]));
@@ -63,7 +50,6 @@ async function prepareScreens(project: string, plan: Plan, manifest: Manifest, s
   const files = await Promise.all(unique.map(async (selected, index) => {
     const record = catalog.get(selected);
     if (!record) throw new Error("Selected file is absent from manifest: " + selected);
-    checkSDR(record);
     const source = path.join(assetRoot, ...selected.split("/"));
     if (!(await lstat(source)).isFile() || !isWithin(assetRoot, await realpath(source))) {
       throw new Error("Selected asset is no longer a regular local file: " + selected);
@@ -126,10 +112,11 @@ async function prepareScreens(project: string, plan: Plan, manifest: Manifest, s
 }
 
 export function verifyFactoryMp4(file: string, aspect: AspectId, fps: number, expectedFrames: number, audio = false, h264Profile?: string) {
+  const localMp4 = ["-protocol_whitelist", "file", "-f", "mov", "-enable_drefs", "0", "-i", file];
   const probe = mediaCommand("ffprobe", [
     "-v", "error", "-show_streams", "-show_packets", "-show_entries",
     "packet=pts,stream_index:stream=index,codec_type,codec_name,profile,width,height,pix_fmt,color_space,color_range,color_primaries,color_transfer,time_base,avg_frame_rate,nb_frames,duration_ts,bit_rate",
-    "-of", "json", file,
+    "-of", "json", ...localMp4,
   ], "Cannot inspect generated MP4");
   const { streams, packets } = JSON.parse(probe) as {
     streams: Record<string, string | number>[]; packets: { pts: number; stream_index: number }[];
@@ -152,16 +139,22 @@ export function verifyFactoryMp4(file: string, aspect: AspectId, fps: number, ex
       pts.some((value, i) => value * n * fps !== i * d)) {
     throw new Error("Generated MP4 has a duration mismatch or is not constant frame rate from frame zero: " + aspect);
   }
-  ffmpeg(["-threads", "1", "-err_detect", "explode", "-i", file, "-map", "0:v:0", "-f", "null", "-"], "Generated MP4 failed full decode");
+  ffmpeg(["-threads", "1", "-err_detect", "explode", ...localMp4, "-map", "0:v:0", "-f", "null", "-"],
+    "Generated MP4 failed full decode");
   return { ...stream, videoBitrateBps, decoded: true, constantFrameRate: true,
     ...(audio ? { audio: verifyEditorialAudio(file, expectedFrames / fps) } : {}) };
 }
 
 export async function renderClient(input: {
   project: string; output: string; brief: ClientBrief; plan: Plan; manifest: Manifest; aspects: AspectId[];
-  frames?: number[]; frameRange?: FactoryFrameRange; profile?: FactoryRenderProfile;
+  frames?: number[]; frameRange?: FactoryFrameRange; profile?: FactoryRenderProfile; production?: ProductionProfile;
 }) {
   const { project, output, brief, plan, manifest, aspects, frames, frameRange, profile = "preview" } = input;
+  const production = input.production ?? (profile === "preview" ? "preview" : plan.editorial ? "final-audio" : "silent-picture");
+  if ((profile === "preview") !== (production === "preview") || (profile === "master" && (frames || frameRange))) {
+    throw new Error("A governed master requires the master encoder and a full timeline");
+  }
+  validateProductionPlan(production, brief, plan, manifest.assets);
   const fps = plan.filmSpec.output.fps;
   const encoder = factoryEncoding(profile, fps);
   const { h264Profile } = encoder;
@@ -189,6 +182,7 @@ export async function renderClient(input: {
     const screens = await prepareScreens(project, plan, manifest, scratch, publicRoot);
     const files = [];
     const reviewSheets: Array<{ aspect: AspectId; filename: string; frames: number[]; sha256: string }> = [];
+    const samples: Array<{ aspect: AspectId; frame: number; files: Array<{ filename: string; sha256: string }> }> = [];
     const editorial = plan.editorial;
     const logoFile = "factory-brand.png";
     let logoSha256: string | undefined;
@@ -203,7 +197,7 @@ export async function renderClient(input: {
         "-frames:v", "1", "-f", "null", "-"], "Cannot decode editorial logo");
       logoSha256 = await mediaSha256(target);
     }
-    const bed = editorial && !frames && !frameRange ? await prepareEditorialAudio({
+    const bed = editorial && !frames && !frameRange && production !== "silent-picture" ? await prepareEditorialAudio({
       project, scratch, file: editorial.audio.file, gainDb: editorial.audio.gainDb, totalFrames: plan.totalFrames, fps,
       effects: editorial.resolvedSoundCues,
     }) : undefined;
@@ -233,12 +227,22 @@ export async function renderClient(input: {
         }
         const qa = frame === undefined ? verifyFactoryMp4(file, aspect, fps, videoFrames, bed !== undefined, h264Profile ?? undefined) : null;
         files.push({ aspect, filename, sha256: await mediaSha256(file), elapsedSeconds: (Date.now() - start) / 1000, qa });
-        if (frame === undefined && profile === "master" && !frameRange) {
+        if (frame === undefined && profile === "master") {
           const reviewFrames = masterReviewFrames(plan.shots);
           const sheetFilename = "review-" + aspect + ".png";
           const sheetFile = path.join(scratch, sheetFilename);
           makeMasterReviewSheet(file, sheetFile, aspect, reviewFrames);
           reviewSheets.push({ aspect, filename: sheetFilename, frames: [...reviewFrames], sha256: await mediaSha256(sheetFile) });
+          const sampleFrame = reviewFrames[1];
+          const pair = [];
+          for (const take of ["a", "b"]) {
+            const filename = `determinism-${aspect}-${take}.png`;
+            const file = path.join(scratch, filename);
+            await renderStill({ ...browserOptions, composition, output: file, frame: sampleFrame, imageFormat: "png" });
+            pair.push({ filename, sha256: await mediaSha256(file) });
+          }
+          verifySamplePixels(path.join(scratch, pair[0].filename), path.join(scratch, pair[1].filename), aspect);
+          samples.push({ aspect, frame: sampleFrame, files: pair });
         }
       }
       console.log("Rendered " + aspect + " in " + ((Date.now() - start) / 1000).toFixed(2) + "s");
@@ -247,10 +251,14 @@ export async function renderClient(input: {
     await mkdir(delivery);
     for (const file of files) await rename(path.join(scratch, file.filename), path.join(delivery, file.filename));
     for (const sheet of reviewSheets) await rename(path.join(scratch, sheet.filename), path.join(delivery, sheet.filename));
+    for (const { files: pair } of samples) {
+      for (const file of pair) await rename(path.join(scratch, file.filename), path.join(delivery, file.filename));
+    }
     const receipt = {
       schemaVersion: "1", profile, frame: frames?.length === 1 ? frames[0] : null, rightsDeclaration: brief.renderRights,
       ...(frames && frames.length > 1 ? { frames } : {}),
       ...(!frames ? { encoder } : {}),
+      ...(profile === "master" ? { production: { profile: production, expectedFrames: plan.totalFrames, samples } } : {}),
       ...(frameRange ? { sourceFrameRange: { start: frameRange[0], endInclusive: frameRange[1], frameCount: videoFrames } } : {}),
       ...(editorial ? { editorial: { ...editorial, logoSha256, ...(bed ? { audioSha256: bed.sourceSha256, soundCueSources: bed.effects } : {}) } } : {}),
       files, ...(reviewSheets.length ? { reviewSheets } : {}), shots: plan.shots, screens: Object.fromEntries(Object.entries(screens).map(([id, screen]) => {

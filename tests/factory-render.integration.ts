@@ -5,6 +5,7 @@ import { mkdtemp, readFile, readdir, rm, unlink, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { pngPixelHash } from "../scripts/lib/production";
 
 const root = path.resolve(import.meta.dirname, "..");
 const ffmpeg = (...args: string[]) => execFileSync("ffmpeg", ["-nostdin", "-v", "error", "-filter_threads", "1", ...args]);
@@ -82,6 +83,44 @@ test("local screen stills are repeatable and render rejects invalid or unreadabl
   }
   const outputs = (await readdir(out)).filter((name) => name.startsWith("still-"));
   assert.equal(outputs.length, 2);
-  const captures = await Promise.all(outputs.map((name) => readFile(path.join(out, name, "render-test-16x9-f37.png"))));
-  assert.ok(captures[0].equals(captures[1]), "independent still jobs should be byte-identical");
+  const captures = outputs.map((name) => path.join(out, name, "render-test-16x9-f37.png"));
+  assert.equal(pngPixelHash(captures[0], "16x9"), pngPixelHash(captures[1], "16x9"),
+    "independent still jobs should produce identical decoded pixels");
+});
+
+test("a full silent master automatically records review and determinism evidence", async (t) => {
+  const temp = await mkdtemp(path.join(tmpdir(), "factory silent master "));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const project = path.join(temp, "silent-test");
+  const out = path.join(temp, "reports");
+  const created = factory("init", "--name", "silent-test", "--parent", temp);
+  assert.equal(created.code, 0, created.output);
+  const file = path.join(project, "brief.json");
+  const brief = JSON.parse(await readFile(file, "utf8"));
+  const image = "screen.jpg";
+  await writeFile(file, JSON.stringify({
+    ...brief, fps: 30, durationSeconds: 6, hero: image, aspectRatios: ["1:1"],
+    features: brief.features.map((feature: object) => ({ ...feature, asset: image })),
+    renderRights: { origin: "synthetic", approved: true, license: "Test generator", privacy: "Synthetic only" },
+  }));
+  execFileSync("ffmpeg", ["-nostdin", "-v", "error", "-f", "lavfi", "-i", "color=blue:size=96x160",
+    "-frames:v", "1", "-threads", "1", path.join(project, "assets", "screenshots", image)]);
+  const rendered = factory("render", "--project", project, "--out", out, "--profile", "master");
+  assert.equal(rendered.code, 0, rendered.output);
+  const batches = (await readdir(out)).filter((name) => name.startsWith("master-"));
+  assert.equal(batches.length, 1);
+  const batch = path.join(out, batches[0]);
+  const receipt = JSON.parse(await readFile(path.join(batch, "render-report.json"), "utf8"));
+  assert.equal(receipt.production.profile, "silent-picture");
+  assert.equal(receipt.production.expectedFrames, 180);
+  const evidence = path.join(temp, "review.json");
+  await writeFile(evidence, JSON.stringify({
+    schemaVersion: "1", masterSha256: receipt.files[0].sha256,
+    visualReview: { reviewer: "Synthetic test reviewer", notes: "Test fixture review record" },
+  }));
+  const accepted = spawnSync(process.execPath, ["--import", "tsx", "scripts/validate-production.ts", "--master",
+    path.join(batch, receipt.files[0].filename), "--evidence", evidence], { cwd: root, encoding: "utf8", timeout: 90000 });
+  if (accepted.error) throw accepted.error;
+  assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
+  assert.match(accepted.stdout, /silent-picture technical PASS.*Creative approval pending/);
 });
